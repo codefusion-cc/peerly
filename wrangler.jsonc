@@ -1,33 +1,24 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "peerly",
-  "main": "worker/index.mjs",
-  "compatibility_date": "2026-07-22",
-  // The worker's own imports reach into `packages/core/dist` — the shared
-  // control plane is TypeScript compiled to JS, and `worker/realtime/*.mjs`
-  // loads it from there. Bundling without it fails at
-  // `packages/core/worker/realtime/index.mjs:19`, which is how a Workers Build
-  // fails on a clean checkout while every local build succeeds on a warm one.
-  // Declared here so any path that bundles this worker gets it, not only the
-  // ones that happen to run `npm run build` first.
-  "build": { "command": "npm run build:core" },
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "upload_source_maps": true,
+  "build": {
+    "command": "npm run build"
+  },
   "vars": {
-    // The auth bridge executes in the Worker runtime, where Cloudflare's
-    // build-time VITE_* variables are not available automatically.
-    "VITE_GOOGLE_CLIENT_ID": "724645084534-eb9led5upjj8p46dr890tg3a0k3sonsk.apps.googleusercontent.com",
     "APP_ID": "peerly",
-    // Production stays on the legacy relay until the Durable Objects control
-    // plane passes its seven-day exit criteria (see
-    // docs/DURABLE_OBJECTS_ARCHITECTURE.md Phase 5).
-    //
-    // IMPORTANT: no `durable_objects`/`migrations` may appear in this file
-    // until that cutover PR. Workers Builds deploys every non-production
-    // branch with `wrangler versions upload`, and Cloudflare rejects any
-    // version that carries a Durable Object migration (API error 10211) —
-    // migrations only apply through a full deploy, which happens on merge to
-    // main. The DO-enabled staging worker lives in wrangler.preview.jsonc.
-    "COORDINATION_BACKEND": "legacy-relay",
-    "CONTENT_BACKEND": "p2p"
+    "APP_ENV": "production",
+    // Sign-in providers: set the ones this deployment offers (README, "Identity providers").
+    "GOOGLE_CLIENT_ID": "724645084534-eb9led5upjj8p46dr890tg3a0k3sonsk.apps.googleusercontent.com"
+  },
+  // NETWORK_SESSION_SECRET signs capabilities and cookies (`current:previous` while it rotates);
+  // OPAQUE_USER_ID_SECRET derives account and member ids and workspace routes, and never changes.
+  // TURN_KEY_ID and TURN_KEY_API_TOKEN are a Cloudflare Realtime TURN key: premium accounts' relays.
+  "secrets": {
+    "required": ["NETWORK_SESSION_SECRET", "OPAQUE_USER_ID_SECRET", "TURN_KEY_ID", "TURN_KEY_API_TOKEN"]
   },
   "assets": {
     "binding": "ASSETS",
@@ -36,11 +27,19 @@
     "run_worker_first": ["/api/*"]
   },
   "ratelimits": [
-    {
-      "name": "RENDEZVOUS_RATE_LIMITER",
-      "namespace_id": "1001",
-      "simple": { "limit": 30, "period": 60 }
-    }
+    { "name": "AUTH_RATE_LIMITER", "namespace_id": "1005", "simple": { "limit": 10, "period": 60 } },
+    { "name": "AUTH_IP_RATE_LIMITER", "namespace_id": "1006", "simple": { "limit": 60, "period": 60 } },
+    { "name": "MEDIA_RATE_LIMITER", "namespace_id": "1007", "simple": { "limit": 6, "period": 60 } }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "USER_GATEWAYS", "class_name": "UserGateway" },
+      { "name": "CHANNELS", "class_name": "Channel" }
+    ]
+  },
+  // Production had no Durable Objects before 2.0: these apply with the first full deploy (merge to main).
+  "migrations": [
+    { "tag": "v2-1", "new_sqlite_classes": ["UserGateway", "Channel"] }
   ],
   "observability": { "enabled": true, "head_sampling_rate": 1 }
 }
