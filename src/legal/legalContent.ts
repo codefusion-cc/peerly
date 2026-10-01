@@ -1,4 +1,4 @@
-import { legalMeta as m } from './legalMeta'
+import { legalMeta as m } from './legalMeta.ts'
 
 /**
  * In-app legal texts (Privacy Policy + Terms). Authoritative source; the

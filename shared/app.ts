@@ -9,8 +9,8 @@ export const PLANS = [PREMIUM] as const
 export const ROUTES = Object.freeze({
   /** The sign-in providers this deployment offers. */
   signInOptions: '/api/auth/providers',
-  /** Apple's form_post return. */
-  appleCallback: '/api/auth/apple/callback',
+  /** Microsoft, Apple and OpenID Connect return here by form post: `/api/auth/<provider>/callback`. */
+  signInCallback: (provider: 'microsoft' | 'apple' | 'oidc') => `/api/auth/${provider}/callback`,
   /** A workspace's channel, by its route id: `/api/workspaces/<routeId>`. */
   workspaces: '/api/workspaces/',
   /** A direct conversation's channel: `/api/dms/<routeId>`. */

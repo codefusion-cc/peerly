@@ -4,7 +4,7 @@
     "target": "es2023",
     "lib": ["ES2023"],
     "module": "esnext",
-    "types": ["./worker-configuration.d.ts"],
+    "types": ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

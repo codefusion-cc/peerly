@@ -3,12 +3,11 @@ import { join } from 'path'
 
 /**
  * Fails the build if a production bundle contains material that must never
- * reach users. Today that is the E2E fake-issuer RSA private key: it is public
- * in git and mints tokens this app accepts as genuine, so if it ships and
- * anyone builds with VITE_E2E_AUTH_BYPASS=true, workspace access is forgeable.
+ * reach users: the end-to-end test issuer's RSA private key. It is public in
+ * git and mints tokens a test Worker accepts, so it must never ship.
  *
- * The protection is bundler dead-code elimination (see e2eAuth.ts), which is
- * easy to defeat by accident — a stray static `import './e2eKeys'`, or routing
+ * The protection is bundler dead-code elimination (see src/auth/e2eSignIn.ts), which is
+ * easy to defeat by accident — a stray static `import './e2eKeys.ts'`, or routing
  * the guard through a function the bundler cannot fold. This asserts the
  * outcome rather than trusting the mechanism.
  */
@@ -19,8 +18,6 @@ const FORBIDDEN = [
   { label: 'E2E RSA private exponent (d)', needle: 'NqIymRvy3qsy_VGDrWFbp70XvKmt6c4Mc9r8aT1BoNtor' },
   { label: 'E2E RSA prime (p)', needle: '8p03H2OFkL4sVSwxfbQ_3LWa7QO1f9uJPD4k0sXwEDRny' },
   { label: 'E2E fake-Google public modulus (n)', needle: 'zrpA9xwzeaU2ZndxJNk7I3wH8scLSOW5UVgYqEl478G1MyGLsk0A6aQtZrJVky1uwbocZEDeYcRA48YM1W6wv8WOucjkd05yWse2uB' },
-  { label: 'static relay credential sentinel', needle: 'STATIC_RELAY_SECRET_MUST_NOT_SHIP' },
-  { label: 'static TURN credential sentinel', needle: 'STATIC_TURN_SECRET_MUST_NOT_SHIP' },
 ]
 
 function walk(dir) {
@@ -53,7 +50,7 @@ if (violations.length > 0) {
   console.error('guard:bundle FAILED — forbidden credential material is in the production bundle:\n')
   for (const violation of violations) console.error(`  - ${violation}`)
   console.error(
-    '\nThe E2E auth fixtures must stay behind the dead-code guard in src/collab/e2eAuth.ts.\n' +
+    '\nThe E2E auth fixtures must stay behind the dead-code guard in src/auth/e2eSignIn.ts.\n' +
       'Check for a static import of ./e2eKeys, or a guard the bundler cannot fold to a constant.'
   )
   process.exit(1)

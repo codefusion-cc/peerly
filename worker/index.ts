@@ -7,7 +7,7 @@
 import { handleGoogleSignIn } from '@codefusion-cc/google-sign-in'
 import { handleRealtimeRoute, prepareAuthenticatedRealtimeUpgrade, type RealtimeRouteConfig } from '@codefusion-cc/realtime'
 import { APP_ID, ROUTES } from '../shared/app.ts'
-import { handleAppleCallback } from './appleCallback.ts'
+import { handleSignInCallback } from './signInCallback.ts'
 import { handleIceServers } from './ice.ts'
 import { signInOptions, signInVerifier, type SignInEnv } from './signInProviders.ts'
 
@@ -71,8 +71,8 @@ export default {
       if (request.method !== 'GET') return json({ code: 'method-not-allowed' }, 405)
       return json({ providers: await signInOptions(env) })
     }
-    const apple = await handleAppleCallback(request, ROUTES.appleCallback, signInReturns(env))
-    if (apple) return apple
+    const returned = await handleSignInCallback(request, signInReturns(env))
+    if (returned) return returned
     const google = await handleGoogleSignIn(request, {
       allowedOrigin: signInReturns(env), loginPath: '/signin', context,
       page: { background: { light: '#f7f7fb', dark: '#111318' } },

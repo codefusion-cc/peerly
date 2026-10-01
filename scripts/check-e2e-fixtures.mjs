@@ -33,8 +33,8 @@ function walk(dir) {
   return out
 }
 
-if (process.env.VITE_E2E_AUTH_BYPASS !== 'true') {
-  console.error('check:e2e-fixtures — only meaningful for a VITE_E2E_AUTH_BYPASS=true build.')
+if (process.env.VITE_E2E_AUTH !== 'true') {
+  console.error('check:e2e-fixtures — only meaningful for a VITE_E2E_AUTH=true build.')
   process.exit(2)
 }
 
@@ -54,7 +54,7 @@ if (missing.length > 0) {
   for (const { label } of missing) console.error(`  - ${label}`)
   console.error(
     '\nSign-in would fail with an unexplained bad signature. Something folded the\n' +
-      'guarded dynamic import in src/collab/e2eAuth.ts to false.'
+      'guarded dynamic import in src/auth/e2eSignIn.ts to false.'
   )
   process.exit(1)
 }

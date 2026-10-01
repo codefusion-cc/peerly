@@ -1,25 +1,17 @@
-import { ThemeToggle } from '../components/ThemeToggle'
-import { useI18n } from '../i18n'
-import { legalDocs, type LegalDocId } from './legalContent'
-
-type Props = {
-  doc: LegalDocId
-  onBack: () => void
-}
+import { ArrowLeft } from 'lucide-react'
+import { useI18n } from '../i18nContext.tsx'
+import { legalDocs, type LegalDocId } from './legalContent.ts'
 
 /** Static, public legal page (Privacy Policy / Terms) in the current locale. */
-export function LegalPage({ doc, onBack }: Props) {
-  const { tr, locale } = useI18n()
+export function LegalPage({ doc, onBack }: { doc: LegalDocId; onBack(): void }) {
+  const { t, locale } = useI18n()
   const content = legalDocs[locale][doc]
 
   return (
     <div className="min-h-full bg-base-100 text-base-content">
-      <div className="fixed right-4 top-4 z-20">
-        <ThemeToggle compact />
-      </div>
-      <main className="mx-auto w-full max-w-3xl px-4 py-8 md:px-6">
+      <main id="content" className="mx-auto w-full max-w-3xl px-4 py-8 md:px-6">
         <button type="button" className="btn btn-ghost btn-sm mb-6" onClick={onBack} data-testid="legal-back">
-          ← {tr('Back')}
+          <ArrowLeft className="size-4" aria-hidden="true" />{t.back}
         </button>
 
         <article className="card border border-base-300 bg-base-100 shadow-sm">

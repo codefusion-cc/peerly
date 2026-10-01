@@ -1,7 +1,8 @@
 // How the Worker's workerd tests sign people in: through the real routes and
 // the `oidc` provider, with the e2e issuer's key (its key set is served to the
 // Worker by a stubbed fetch).
-import { env, SELF } from 'cloudflare:test'
+import { SELF } from 'cloudflare:test'
+import { env } from 'cloudflare:workers'
 import { vi } from 'vitest'
 import { createAccountKeys } from '@codefusion-cc/realtime/browser'
 import { openControlSocket, PROOF_PURPOSES, testDevice, type TestDevice } from '@codefusion-cc/realtime/testing'
@@ -57,9 +58,15 @@ export async function signIn(email = `${crypto.randomUUID().slice(0, 8)}@example
   }
 }
 
+/** What the tests call on an account gateway, besides its sockets. */
+type GatewayRpc = {
+  setMembership(grant: { plan: string | null; until?: number | null; by: string; note?: string }): Promise<{ ok: boolean; code?: string }>
+  membership(): Promise<{ plan: string | null; until: number | null }>
+}
+
 /** The person's account gateway, and a control socket to it. */
 export async function control(person: Person) {
-  const gateway = env.USER_GATEWAYS.getByName(`${APP_ID}:${person.uid}`)
+  const gateway = env.USER_GATEWAYS.getByName(`${APP_ID}:${person.uid}`) as unknown as GatewayRpc
   const socket = await openControlSocket(gateway as never, { uid: person.uid, deviceKeyId: person.device.deviceKeyId, sid: person.sid, publicUserId: person.userId })
   return { gateway, socket }
 }

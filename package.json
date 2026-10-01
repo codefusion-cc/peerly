@@ -55,6 +55,7 @@
     "@codefusion-cc/realtime-media": "^1.1.0",
     "@codefusion-cc/realtime-p2p": "^1.0.0",
     "@codefusion-cc/theme": "^1.0.0",
+    "lucide-react": "^1.49.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

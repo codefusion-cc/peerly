@@ -1,9 +1,10 @@
 /**
- * Sign in with Apple returns by form POST (`response_mode=form_post`, which
- * Apple requires when the address is asked for). This route takes the post
- * and sends the browser on to the sign-in page with the token in the URL
- * fragment, which never reaches a server; the page then checks the state it
- * started with, as for the other providers.
+ * Microsoft, Apple and OpenID Connect sign-ins return by form POST
+ * (`response_mode=form_post`; Apple requires it when the address is asked
+ * for). This route takes the post and sends the browser on to the sign-in
+ * page with the token in the URL fragment, which never reaches a server; the
+ * page then checks the state it started with. Google has its own route
+ * (`@codefusion-cc/google-sign-in`).
  *
  * The state names where to return (`<random>.<base64url JSON [origin, path]>`).
  * The token goes only to this Worker's origin or one `allowedOrigin` accepts:
@@ -36,10 +37,15 @@ export function signInReturn(state: string, self: string, allowedOrigin: (origin
   return `${origin}${path}`
 }
 
-/** Answers Apple's form post at `path`, or null for any other request. */
-export async function handleAppleCallback(request: Request, path: string, allowedOrigin: (origin: string) => boolean): Promise<Response | null> {
+/** The providers that return here, at `/api/auth/<provider>/callback`. */
+export const FORM_POST_PROVIDERS = ['microsoft', 'apple', 'oidc'] as const
+const CALLBACK = /^\/api\/auth\/(microsoft|apple|oidc)\/callback$/
+
+/** Answers a provider's form post at `/api/auth/<provider>/callback`, or null for any other request. */
+export async function handleSignInCallback(request: Request, allowedOrigin: (origin: string) => boolean): Promise<Response | null> {
   const url = new URL(request.url)
-  if (url.pathname !== path) return null
+  const provider = CALLBACK.exec(url.pathname)?.[1]
+  if (!provider) return null
   if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { allow: 'POST' } })
   if (!request.headers.get('content-type')?.startsWith('application/x-www-form-urlencoded')) return new Response('Unsupported', { status: 415 })
   const text = await request.text()
@@ -50,7 +56,7 @@ export async function handleAppleCallback(request: Request, path: string, allowe
   if (!destination) return new Response('Unknown sign-in', { status: 400 })
   const token = form.get('id_token') ?? ''
   const error = form.get('error') ?? ''
-  const fragment = new URLSearchParams({ provider: 'apple', state })
+  const fragment = new URLSearchParams({ provider, state })
   if (TOKEN.test(token)) fragment.set('id_token', token)
   else fragment.set('error', ERROR.test(error) ? error : 'no_credential')
   return new Response(null, {

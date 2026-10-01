@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test'
+import { env } from 'cloudflare:workers'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { PREMIUM } from '../shared/app.ts'
 import { handleIceServers } from './ice.ts'
@@ -32,7 +32,7 @@ describe('ICE servers', () => {
   it('gives a premium account TURN as well as STUN', async () => {
     const person = await premium()
     const turn = withTurn(() => Response.json(turnAnswer, { status: 201 }))
-    const body = await (await turn.ask(person.cookie)).json() as { iceServers: RTCIceServer[]; relay: boolean; ttlMs: number }
+    const body = await (await turn.ask(person.cookie)).json() as { iceServers: Array<{ urls: string | string[] }>; relay: boolean; ttlMs: number }
     expect(body.relay).toBe(true)
     expect(body.iceServers.flatMap(server => server.urls)).toContain('turn:turn.cloudflare.com:3478?transport=udp')
     expect(body.ttlMs).toBeGreaterThan(0)

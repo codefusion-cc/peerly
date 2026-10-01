@@ -1,0 +1,151 @@
+@import 'tailwindcss';
+
+/*
+ * Peerly's look: violet collaboration, blue connectivity and teal files, from
+ * the app's icon, on calm neutral surfaces. Every colour is a daisyUI theme
+ * token, so components never name a raw colour; `data-theme` on <html>
+ * (set before paint by @codefusion-cc/theme) picks light or dark.
+ */
+@plugin "daisyui" {
+  themes: peerly --default, peerly-dark --prefersdark;
+}
+
+@plugin "daisyui/theme" {
+  name: 'peerly';
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: oklch(99.5% 0.003 275);
+  --color-base-200: oklch(97.4% 0.007 275);
+  --color-base-300: oklch(92% 0.013 275);
+  --color-base-content: oklch(26% 0.03 270);
+
+  --color-primary: oklch(52% 0.22 295);
+  --color-primary-content: oklch(99% 0.005 295);
+  --color-secondary: oklch(56% 0.17 248);
+  --color-secondary-content: oklch(99% 0.005 245);
+  --color-accent: oklch(60% 0.12 185);
+  --color-accent-content: oklch(99% 0.01 185);
+  --color-neutral: oklch(32% 0.03 270);
+  --color-neutral-content: oklch(98% 0.005 270);
+
+  --color-info: oklch(56% 0.17 248);
+  --color-info-content: oklch(99% 0.005 245);
+  --color-success: oklch(58% 0.13 165);
+  --color-success-content: oklch(99% 0.005 165);
+  --color-warning: oklch(72% 0.16 70);
+  --color-warning-content: oklch(24% 0.05 70);
+  --color-error: oklch(56% 0.21 25);
+  --color-error-content: oklch(99% 0.005 25);
+
+  --radius-selector: 0.625rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: 'peerly-dark';
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: oklch(18% 0.02 275);
+  --color-base-200: oklch(15.5% 0.02 275);
+  --color-base-300: oklch(25% 0.026 275);
+  --color-base-content: oklch(93% 0.012 275);
+
+  --color-primary: oklch(72% 0.17 295);
+  --color-primary-content: oklch(17% 0.04 295);
+  --color-secondary: oklch(74% 0.13 245);
+  --color-secondary-content: oklch(17% 0.035 245);
+  --color-accent: oklch(76% 0.11 185);
+  --color-accent-content: oklch(16% 0.035 185);
+  --color-neutral: oklch(30% 0.03 270);
+  --color-neutral-content: oklch(94% 0.01 270);
+
+  --color-info: oklch(74% 0.13 245);
+  --color-info-content: oklch(16% 0.035 245);
+  --color-success: oklch(74% 0.12 165);
+  --color-success-content: oklch(15% 0.035 165);
+  --color-warning: oklch(80% 0.13 75);
+  --color-warning-content: oklch(19% 0.04 75);
+  --color-error: oklch(72% 0.16 25);
+  --color-error-content: oklch(16% 0.04 25);
+
+  --radius-selector: 0.625rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@theme {
+  --font-sans: 'Inter Variable', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* The conversation's measure: lines stay readable on a wide screen. */
+  --container-thread: 52rem;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-base-200 text-base-content font-sans antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Keyboard users always see where they are; daisyUI covers its own components. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary;
+  }
+
+  /* Text the person may want to copy (messages, ids) keeps normal selection everywhere. */
+  ::selection {
+    @apply bg-primary/25;
+  }
+}
+
+@layer components {
+  .brand-wordmark {
+    background: linear-gradient(100deg, var(--color-primary) 10%, var(--color-secondary) 60%, var(--color-accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Thin, quiet scrollbars for the long lists (channels, messages). */
+  .scroll-quiet {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--color-base-content) 22%, transparent) transparent;
+  }
+
+  /* Visually hidden, still read by screen readers. */
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    @apply sr-only;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

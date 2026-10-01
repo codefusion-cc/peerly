@@ -1,12 +1,13 @@
-import { env } from 'cloudflare:test'
+import { env } from 'cloudflare:workers'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { PREMIUM } from '../shared/app.ts'
 import { accountKeys, authorize, capability, control, join, memberList, serveIssuerKeys, signIn } from './testing.workers.ts'
 
 beforeAll(serveIssuerKeys)
 
-const result = (answer: { type: string; payload: Record<string, any> }) => answer.payload.result
-const refused = (answer: { type: string; payload: Record<string, any> }) => answer.type === 'error' ? answer.payload.code : null
+type Answer = { type: string; payload?: Record<string, any> }
+const result = (answer: Answer) => answer.payload?.result
+const refused = (answer: Answer) => answer.type === 'error' ? answer.payload?.code : null
 const routeOf = async (...args: Parameters<typeof authorize>) => result(await authorize(...args)).routeId as string
 
 describe('entering a workspace', () => {
