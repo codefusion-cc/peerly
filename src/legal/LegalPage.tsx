@@ -36,7 +36,7 @@ export function LegalPage({ doc, onBack }: { doc: LegalDocId; onBack(): void }) 
                     }
                     if ('note' in block) {
                       return (
-                        <p key={i} className="rounded-box border border-success/40 bg-success/10 px-4 py-3 text-success-content/90">
+                        <p key={i} className="rounded-box border border-success/40 bg-success/10 px-4 py-3 text-base-content">
                           {block.note}
                         </p>
                       )

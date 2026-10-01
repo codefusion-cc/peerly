@@ -18,6 +18,11 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await signInPage.goto('/')
     await expect(signInPage.getByTestId('e2e-email')).toBeVisible()
     await accessible(signInPage, 'sign-in')
+    for (const document of ['privacy', 'terms']) {
+      await signInPage.goto(`/${document}`)
+      await expect(signInPage.getByRole('heading', { level: 1 })).toBeVisible()
+      await accessible(signInPage, document)
+    }
     await signInContext.close()
 
     const ala = await signIn(browser, 'ala')

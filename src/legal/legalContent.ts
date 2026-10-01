@@ -1,12 +1,15 @@
 import { legalMeta as m } from './legalMeta.ts'
 
 /**
- * In-app legal texts (Privacy Policy + Terms). Authoritative source; the
- * `docs/legal/*.md` files are English exports. Written to match what Peerly
- * actually does: invite-only hybrid collaboration with encrypted durable
- * message delivery, peer-to-peer files/media, and no analytics.
+ * In-app legal texts (Privacy Policy and Terms), the authoritative source; the
+ * docs/legal/*.md files are their English export (`npm run legal:export`, and
+ * a test fails when they differ). Written to match what Peerly 2.0 does:
+ * invite-only workspaces whose content goes between the members' devices,
+ * end-to-end encrypted, a server that signs people in, checks who may enter
+ * and introduces devices, and, for a premium owner, keeps encrypted history
+ * and relays connections.
  *
- * Not a substitute for review by a lawyer before a public/commercial launch.
+ * Not a substitute for review by a lawyer before a commercial launch.
  */
 export type LegalBlock = { p: string } | { ul: string[] } | { note: string }
 export type LegalSection = { heading: string; blocks: LegalBlock[] }
@@ -19,154 +22,51 @@ const updatedLabel = { pl: `Ostatnia aktualizacja: ${m.lastUpdated}`, en: `Last 
 // Privacy Policy
 // ---------------------------------------------------------------------------
 
-const privacyPl: LegalDoc = {
-  title: 'Polityka prywatności',
-  updated: updatedLabel.pl,
-  intro:
-    'Peerly to hybrydowe narzędzie do współpracy zespołowej. Wiadomości i reakcje są szyfrowane na urządzeniu i dostarczane oraz krótko przechowywane przez naszą infrastrukturę, natomiast pliki i połączenia podróżują bezpośrednio między przeglądarkami przez WebRTC (P2P). Korzystanie z Peerly wiąże się też z przetwarzaniem niektórych danych osobowych, np. adresu IP i adresów e-mail zaproszonych osób. Ten dokument to wyjaśnia.',
-  sections: [
-    {
-      heading: '1. Administrator danych',
-      blocks: [
-        { p: `Administratorem danych jest ${m.controller} (osoba fizyczna prowadząca serwis Peerly), ${m.country}. Kontakt w sprawach prywatności: ${m.privacyEmail}.` },
-      ],
-    },
-    {
-      heading: '2. Nasze podejście: szyfrowana trwałość i P2P',
-      blocks: [
-        { p: 'Wiadomości, reakcje i definicje kanałów są szyfrowane w przeglądarce przed wysłaniem. Nasza infrastruktura Cloudflare Durable Objects przechowuje wyłącznie zaszyfrowane koperty zdarzeń i nie otrzymuje klucza przestrzeni ani rozmowy potrzebnego do odczytania treści. Pliki oraz obraz i dźwięk z połączeń nie są przechowywane w Durable Objects: pozostają lokalnie i są przesyłane P2P. Produkcja obecnie korzysta z P2P do wiadomości; Durable Objects działają na preview do czasu przełączenia produkcji.' },
-      ],
-    },
-    {
-      heading: '3. Jakie dane są przetwarzane',
-      blocks: [
-        { p: 'Logowanie (OIDC): logujesz się przez zewnętrznego dostawcę (Google, Microsoft, Apple lub inny OIDC). Token tożsamości jest wysyłany do naszego Workera w celu weryfikacji. Odczytany adres e-mail służy do utworzenia pseudonimowego identyfikatora członka; token i surowy adres e-mail nie są zapisywane w Durable Object. Nazwa i adres e-mail są też zapisywane lokalnie w przeglądarce.' },
-        { p: 'Lista dostępu (zaproszenia): twórca przestrzeni podpisuje listę adresów e-mail osób uprawnionych do dołączenia. Uczestnicy widzą tę listę. Worker przetwarza ją przy autoryzacji, weryfikuje podpis i przekazuje Durable Object wyłącznie pseudonimowe identyfikatory członków, a nie surowe adresy.' },
-        { p: 'Lobby i zaproszenia do znajomych: nietrwały przekaźnik lub kanał Durable Object przekazuje podpisaną obecność i szyfrowane zaproszenia kierowane do odbiorcy. Publiczna obecność zawiera nazwę, pseudonimowe identyfikatory użytkownika i urządzenia, klucz zaproszeń oraz krótkotrwałe poświadczenie zweryfikowane przez nasz Worker. Nie zawiera tokena OIDC ani adresu e-mail z tego tokena. Zaproszenie może zawierać adres e-mail i poświadczenie OIDC nadawcy wewnątrz treści zaszyfrowanej dla odbiorcy; nie jest przechowywane jako historia ani skrzynka na serwerze.' },
-        { p: 'Adres IP: natura WebRTC sprawia, że łącząc się z uczestnikiem prywatnej przestrzeni lub rozmowy, Wasze przeglądarki wymieniają adresy IP; są one też widoczne dla operatorów przekaźników/TURN. Publiczna obecność i routing zaproszeń korzystają z kanału przekaźnika i nie tworzą połączenia WebRTC z każdą osobą online.' },
-        { p: 'Obecność w przestrzeni: nasz przekaźnik może tymczasowo (do ok. 45 sekund od ostatniego sygnału) przetwarzać niejawny identyfikator przestrzeni, pseudonimowy identyfikator członka i zaszyfrowane dane obecności, aby lista online działała także podczas zestawiania połączenia P2P. Przekaźnik nie otrzymuje klucza potrzebnego do odszyfrowania tych danych.' },
-        { p: 'Treści i metadane: Durable Objects otrzymują zaszyfrowane wiadomości, reakcje i definicje kanałów oraz widoczne dla infrastruktury pseudonimowe identyfikatory użytkownika i urządzenia, typ zdarzenia i czas. Nazwy i awatary są szyfrowane w treści przestrzeni; nazwa wyświetlana w publicznym lobby jest widoczna dla jego uczestników. Pliki oraz obraz/dźwięk z połączeń trafiają bezpośrednio do uczestników P2P.' },
-        { p: 'Dane w urządzeniu: historia i preferencje (localStorage), oczekujące wiadomości i pliki (IndexedDB), klucz kryptograficzny urządzenia, zapamiętane przestrzenie i zgody — w pamięci lokalnej Twojej przeglądarki. Opcjonalne parowanie synchronizuje wybrane dane bezpośrednio między wzajemnie zatwierdzonymi urządzeniami, gdy oba są online; sesje logowania, tokeny tożsamości i prywatne klucze nie są kopiowane.' },
-        { note: 'Nie prowadzimy analityki, nie używamy pikseli śledzących ani reklam. Nie sprzedajemy danych.' },
-      ],
-    },
-    {
-      heading: '4. Podstawy prawne (RODO art. 6)',
-      blocks: [
-        { ul: [
-          'Wykonanie usługi, o którą prosisz (art. 6 ust. 1 lit. b) — dostarczenie zaszyfrowanych zdarzeń, zestawienie połączenia P2P oraz weryfikacja logowania i listy dostępu.',
-          'Prawnie uzasadniony interes (art. 6 ust. 1 lit. f) — bezpieczeństwo infrastruktury, niezawodne dostarczanie i kontrola dostępu do przestrzeni.',
-          'Zgoda (art. 6 ust. 1 lit. a) — dostęp do kamery/mikrofonu, akceptacja Regulaminu.',
-        ] },
-      ],
-    },
-    {
-      heading: '5. Kto może zobaczyć Twoje dane',
-      blocks: [
-        { ul: [
-          'Inni uczestnicy przestrzeni — widzą Twoją nazwę, awatar, wiadomości, pliki i Twój adres IP; twórca i uczestnicy widzą też listę zaproszonych adresów e-mail.',
-          'Cloudflare i operator Peerly — zaszyfrowane koperty oraz pseudonimowe identyfikatory, typy zdarzeń, czas, krótkotrwałe dane lobby/zaproszeń i standardowe logi żądań; bez klucza do odczytania zaszyfrowanych treści.',
-          'Operatorzy przekaźników i serwera TURN — metadane połączenia, krótkotrwałe pseudonimowe dane obecności i adresy IP.',
-          'Dostawca logowania (Google/Microsoft/Apple/OIDC).',
-        ] },
-      ],
-    },
-    {
-      heading: '6. Podmioty trzecie',
-      blocks: [
-        { ul: [
-          'Dostawcy tożsamości OIDC — logowanie.',
-          'Publiczne przekaźniki Nostr / relay WebSocket — sygnalizacja P2P.',
-          'Serwer TURN (opcjonalnie).',
-          'Cloudflare — hosting, Worker i Durable Objects przechowujące zaszyfrowane zdarzenia.',
-        ] },
-        { p: 'Niektórzy dostawcy mogą przetwarzać dane poza EOG na podstawie mechanizmów RODO (np. standardowych klauzul umownych).' },
-      ],
-    },
-    {
-      heading: '7. Przechowywanie i usuwanie',
-      blocks: [
-        { p: 'W trybie Durable Objects zaszyfrowane zdarzenia czatu są przechowywane maksymalnie przez 30 dni i w limicie 1000 najnowszych zdarzeń na przestrzeń lub rozmowę; starsze zdarzenia są automatycznie usuwane. Zaszyfrowany bieżący stan kanałów i rekordy ich usunięcia są zachowywane osobno, bez tego limitu czasu, aby umożliwić synchronizację urządzeń po dłuższej nieobecności. Dane lokalne możesz usunąć w każdej chwili (wyloguj się, opuść lub wyczyść przestrzeń, wyczyść dane witryny). Kopie wysłane innym pozostają na ich urządzeniach. W sprawie kopii serwerowej napisz na adres kontaktowy poniżej.' },
-      ],
-    },
-    {
-      heading: '8. Twoje prawa',
-      blocks: [
-        { p: 'Masz prawo dostępu, sprostowania, usunięcia, ograniczenia, przenoszenia i sprzeciwu. Wiele z nich realizujesz samodzielnie w przeglądarce; w pozostałych sprawach napisz na ' + m.privacyEmail + '.' },
-        { p: `Masz też prawo wnieść skargę do organu nadzorczego — ${m.supervisoryAuthority}.` },
-      ],
-    },
-    {
-      heading: '9. Pliki cookie i pamięć lokalna',
-      blocks: [
-        { p: 'Nie używamy plików cookie do śledzenia ani reklam. Korzystamy wyłącznie z niezbędnej pamięci lokalnej (localStorage/IndexedDB) do działania funkcji, które włączasz. Logowanie zewnętrzne może ustawiać własne pliki cookie dostawcy.' },
-      ],
-    },
-    {
-      heading: '10. Wiek użytkownika',
-      blocks: [
-        { p: `Peerly jest przeznaczony dla osób w wieku co najmniej ${m.minAge} lat.` },
-      ],
-    },
-    {
-      heading: '11. Bezpieczeństwo',
-      blocks: [
-        { p: 'Treść trwałych zdarzeń jest szyfrowana po stronie klienta (AES-GCM), połączenia P2P są szyfrowane (DTLS/SRTP), dostęp jest ograniczony do podpisanej listy członków, a tożsamość urządzeń i autorów jest weryfikowana kryptograficznie. Żaden system nie jest jednak w 100% bezpieczny.' },
-      ],
-    },
-    {
-      heading: '12. Zmiany',
-      blocks: [
-        { p: 'Możemy aktualizować tę Politykę; istotne zmiany zasygnalizujemy w aplikacji i poprosimy o ponowną akceptację.' },
-      ],
-    },
-    {
-      heading: '13. Kontakt',
-      blocks: [
-        { p: `Prywatność: ${m.privacyEmail} · Zgłoszenia nadużyć: ${m.abuseEmail}` },
-      ],
-    },
-  ],
-}
-
 const privacyEn: LegalDoc = {
   title: 'Privacy Policy',
   updated: updatedLabel.en,
   intro:
-    'Peerly is a hybrid team collaboration tool. Messages and reactions are encrypted on your device and delivered and briefly retained by our infrastructure, while files and calls travel directly between browsers over WebRTC (P2P). Using Peerly also involves processing some personal data, such as IP addresses and the email addresses of invited people. This document explains it.',
+    'Peerly is team chat in invite-only workspaces. What you write goes directly between the members’ devices (peer to peer), encrypted end to end. Our servers sign you in, let only the people a workspace lists in, introduce members’ devices to each other and, when a workspace’s owner has Premium, keep its encrypted history. This document explains what data that involves and what rights you have.',
   sections: [
     {
       heading: '1. Data controller',
       blocks: [
-        { p: `The controller is ${m.controller} (an individual operating the Peerly service), ${m.country}. Privacy contact: ${m.privacyEmail}.` },
+        { p: `The data controller is ${m.controller} (a natural person operating Peerly), ${m.country}. Privacy contact: ${m.privacyEmail}.` },
       ],
     },
     {
-      heading: '2. Our approach: encrypted durability and P2P',
+      heading: '2. How Peerly works',
       blocks: [
-        { p: 'Messages, reactions, and channel definitions are encrypted in your browser before transmission. Our Cloudflare Durable Objects infrastructure stores only encrypted event envelopes and does not receive the workspace or conversation key needed to read their content. Files and call audio/video are not stored in Durable Objects: they remain local and transfer P2P. Production currently uses P2P message delivery; Durable Objects run on preview until the production cutover.' },
+        { p: 'Each workspace has a secret made on its owner’s device. It travels only inside the invite link’s fragment (the part after #, which browsers never send to a server) and stays on members’ devices. The key that encrypts the workspace’s content comes from that secret, so our servers can neither read the content nor find the workspace from it.' },
+        { p: 'The owner signs the workspace’s list of email addresses with their account key. Only people on that list can enter, whoever holds the link.' },
+        { p: 'Members’ devices connect directly (WebRTC) and pass messages to each other. Each device keeps what it has received and passes it on to members it meets later, so someone who was away catches up from whoever is online. Without Premium, nothing you write is kept on our servers.' },
       ],
     },
     {
       heading: '3. What data is processed',
       blocks: [
-        { p: 'Sign-in (OIDC): you sign in through a third-party provider (Google, Microsoft, Apple, or another OIDC provider). The ID token is sent to our Worker for verification. Its email is used to derive a pseudonymous member identifier; the token and raw email are not stored in a Durable Object. Your name and email are also stored locally in your browser.' },
-        { p: 'Allow-list (invitations): the workspace creator signs a list of email addresses permitted to join, which members can see. The Worker processes that list during authorization, verifies its signature, and gives the Durable Object only pseudonymous member identifiers rather than raw addresses.' },
-        { p: 'Lobby and friend invitations: a non-persistent relay or Durable Object channel forwards signed public presence and encrypted, directed invitations. Public presence contains a display name, pseudonymous user/device identifiers, an invitation public key, and a short-lived identity certificate verified by our Worker. It contains no OIDC token or email claim. A directed invitation can include its sender’s email and OIDC attestation inside the recipient-encrypted payload; it is not stored as server history or a mailbox.' },
-        { p: 'IP address: by the nature of WebRTC, connecting to a participant in a private workspace or conversation means your browsers exchange IP addresses; they are also visible to relay/TURN operators. Public presence and invitation routing use a relay channel and do not create a WebRTC connection to every online user.' },
-        { p: 'Workspace presence: our relay may temporarily process (for about 45 seconds after the latest signal) an opaque workspace identifier, a pseudonymous member identifier, and encrypted presence data so the online list works while P2P is still connecting. The relay does not receive the key needed to decrypt that data.' },
-        { p: 'Content and metadata: Durable Objects receive encrypted messages, reactions, and channel definitions plus infrastructure-visible pseudonymous user and device identifiers, event type, and time. Names and avatars are encrypted in workspace content; public lobby display names are visible to lobby participants. Files and call audio/video go directly to participants P2P.' },
-        { p: 'On-device data: history and preferences (localStorage), pending messages and files (IndexedDB), a device cryptographic key, remembered workspaces, and consents — in your browser’s local storage. Optional pairing syncs selected data directly between mutually approved devices while both are online; login sessions, identity tokens, and private keys are not copied.' },
-        { note: 'We run no analytics, tracking pixels, or advertising. We do not sell data.' },
+        { p: 'Signing in: you sign in with Google, Microsoft, Apple or your organization’s sign-in (OpenID Connect). Your browser sends us the provider’s identity token once, to verify it. We keep neither the token nor your email address or name on our servers. From the token we derive your account ID (a one-way hash of the provider and your account with it), an internal ID (a keyed hash of the account ID) and a member ID (a keyed hash of your email address), which is how a workspace’s list recognizes you. Your name, email address and photo address from the token stay in your browser, to show who is signed in.' },
+        { p: 'Devices and sessions: your device makes a key of its own, which cannot leave the browser; we keep its public half, your sessions (which device, until when) and the cookie that carries a session. When you link devices, we keep each device’s name (its browser and system, which you can change), when it was linked and last active, its certificate, and your account’s keys sealed for each linked device, which we cannot open.' },
+        { p: 'Entering a workspace: when you open a workspace, your device sends the owner-signed list of members’ email addresses. Our Worker checks the signature, derives each member ID and lets you in if yours is among them. The workspace’s channel keeps only those member IDs and a routing ID derived from the workspace’s secret (not the secret); the email addresses are not kept.' },
+        { p: 'While you are online: the workspace’s channel (a Cloudflare Durable Object) knows which account IDs and devices are connected, and passes on encrypted messages, names, typing notices and the set-up of direct connections between members’ devices. It cannot read them.' },
+        { p: 'Content: messages, edits, deletions, reactions, channel names and the workspace’s name are signed by the device that wrote them and encrypted. They go directly to the members’ devices. If the workspace’s owner has Premium, its channel also keeps encrypted copies of the latest 5,000 changes, so members get them when they come back; this history ends when the owner’s Premium does.' },
+        { p: 'Your name in a workspace: the name you signed in with is sent, encrypted, to the members you meet. Their devices remember the names they have seen in that workspace, and may pass them to other members who have not seen you.' },
+        { p: 'IP address: to connect directly, members’ devices exchange their network addresses (ICE candidates) through the workspace’s channel, including the public address Cloudflare’s STUN server finds. The other members of your workspaces can therefore learn your IP address, and from it your approximate location and internet provider. A Premium account’s connections may go through Cloudflare’s TURN relay instead; Cloudflare then sees your IP address and the connection’s metadata, and the other members see the relay’s address. We pass these addresses only to members of the same workspace and do not keep them.' },
+        { p: 'Your plan: we keep your account ID, when it first and last signed in (updated at most hourly), its plan, when the plan ends, who on our team granted it and when, and an optional note. Our team finds an account by the account ID shown in Settings, which you give them when you ask about your plan.' },
+        { p: 'Diagnostics: for each request the service handles, we record which operation ran, its result, how long it took, and the app version. When something fails, we also keep the error message, where in the code it happened, and the service’s log lines for that request; these records hold no IP addresses, request contents or messages. Separately, Cloudflare’s own logs of our service keep each request’s technical details, including your IP address and browser identification (user agent), for 7 days, for security and troubleshooting.' },
+        { p: 'Error reports: if the app fails in your browser, it sends us the error message and where in the app’s code it happened, which page it was on, the app version, and your browser’s name and major version, operating system and device type. Email addresses, links’ query strings and long identifiers are removed first. It holds no IP address, cookie or identifier.' },
+        { p: 'Page views: each page of the app sends an anonymous view: which page it was (never a workspace, channel or account), the site or campaign that sent you, whether the view comes from a signed-in account, and whether the device is a phone, tablet or computer. The service adds the country, region and city Cloudflare estimates from your connection. Views carry no IP address, cookie or identifier, so they cannot be linked to each other or to you; we count them only in total.' },
+        { p: 'On your device: your workspaces (their secrets and member lists), the messages and changes your device holds, the names it has seen, the device’s key and, once linked, your account’s keys (in IndexedDB); who is signed in, your theme, language and clock choices (in local storage); unsent drafts (for the tab only); and the app’s own files, so it opens offline (in the service worker’s cache).' },
+        { note: 'No advertising, no tracking pixels, no visitor IDs, no profiling. We do not sell data.' },
       ],
     },
     {
       heading: '4. Legal bases (GDPR Art. 6)',
       blocks: [
         { ul: [
-          'Performance of the service you request (Art. 6(1)(b)) — delivering encrypted events, establishing the P2P connection, and verifying sign-in and the allow-list.',
-          'Legitimate interests (Art. 6(1)(f)) — infrastructure security, reliable delivery, and workspace access control.',
-          'Consent (Art. 6(1)(a)) — camera/microphone access, accepting the Terms.',
+          'Performing the service you ask for (Art. 6(1)(b)): signing in, checking a workspace’s list, connecting members’ devices, a Premium workspace’s history and relays, your plan.',
+          'Legitimate interests (Art. 6(1)(f)): security, preventing abuse, diagnostics and error reports to keep the service working, and counting page views in total.',
+          'Workspace owners decide whose email addresses their lists hold, and need their own basis for inviting those people.',
         ] },
       ],
     },
@@ -174,67 +74,188 @@ const privacyEn: LegalDoc = {
       heading: '5. Who can see your data',
       blocks: [
         { ul: [
-          'Other workspace participants — see your name, avatar, messages, files, and IP; the creator and members also see the list of invited email addresses.',
-          'Cloudflare and the Peerly operator — encrypted envelopes plus pseudonymous identifiers, event types, times, transient lobby/invitation data, and standard request logs, without the key needed to read encrypted content.',
-          'Relay and TURN operators — connection metadata, short-lived pseudonymous presence data, and IP addresses.',
-          'The sign-in provider (Google/Microsoft/Apple/OIDC).',
+          'Members of your workspaces: your name, what you write there, when you are online, and your IP address when your devices connect directly. Members see the workspace’s list of email addresses.',
+          'Cloudflare, which hosts the service: encrypted content, account and device IDs, connection metadata and IP addresses (request logs, STUN, TURN); not the keys to the content.',
+          'Our team, in CodeFusion Console (the operator’s administration tool, also on Cloudflare): your account ID, when you were first and last seen and your plan; diagnostics and error reports.',
+          'The provider you sign in with, which knows you signed in to Peerly.',
         ] },
       ],
     },
     {
-      heading: '6. Third parties',
+      heading: '6. Processors',
       blocks: [
         { ul: [
-          'OIDC identity providers — sign-in.',
-          'Public Nostr / WebSocket relays — P2P signaling.',
-          'TURN server (optional).',
-          'Cloudflare — hosting, Worker, and Durable Objects that retain encrypted events.',
+          'Cloudflare Workers and Durable Objects: sign-in, sessions, devices, workspace channels, encrypted history, plans.',
+          'Cloudflare STUN and TURN: finding a device’s public address for direct connections, and relaying a Premium account’s connections.',
+          'Cloudflare Static Assets: serving the app’s files.',
+          'Cloudflare Workers Analytics Engine and D1, through CodeFusion Console: diagnostics, error reports and page view counts.',
+          'Identity providers (Google, Microsoft, Apple, or your organization’s): signing in.',
         ] },
-        { p: 'Some providers may process data outside the EEA under GDPR transfer mechanisms (such as standard contractual clauses).' },
+        { p: 'Cloudflare may process data outside the European Economic Area under the EU Standard Contractual Clauses and the EU–US Data Privacy Framework.' },
       ],
     },
     {
-      heading: '7. Retention and deletion',
+      heading: '7. Retention',
       blocks: [
-        { p: 'In Durable Objects mode, encrypted chat events are retained for at most 30 days and are capped at the latest 1,000 events per workspace or conversation; older events are removed automatically. Encrypted current channel state and deletion records are retained separately without that time limit so devices can reconcile after a long absence. You can delete local data at any time (sign out, leave or clear a workspace, clear site data). Copies sent to others remain on their devices. Contact us below about a server-held copy.' },
+        { ul: [
+          'On your devices: until you leave the workspace, clear messages in Settings → Storage, or clear the browser’s data. Signing out keeps them for when you sign in again.',
+          'Sessions: until they expire (30 days without use) or you sign out. Linked devices: until you unlink them.',
+          'A workspace’s member IDs: while the workspace is used; a newer list replaces them.',
+          'A Premium workspace’s history: the latest 5,000 changes, while the owner’s Premium lasts; it is deleted when Premium ends.',
+          'Your account ID, devices and plan: until you ask us to delete your account.',
+          'Error reports: 30 days; request, diagnostics and page view statistics: 3 months; Cloudflare’s request logs: 7 days.',
+        ] },
       ],
     },
     {
       heading: '8. Your rights',
       blocks: [
-        { p: 'You have rights of access, rectification, erasure, restriction, portability, and objection. You exercise many yourself in the browser; for anything else email ' + m.privacyEmail + '.' },
-        { p: `You may also complain to a supervisory authority — ${m.supervisoryAuthority}.` },
+        { p: `You may ask for access to your data, its correction or deletion, restriction of processing and a copy (portability), and object to processing based on legitimate interests. Write to ${m.privacyEmail} with your account ID from Settings: we keep no email address to find you by. You may also lodge a complaint with ${m.supervisoryAuthority}.` },
+        { p: 'We cannot delete copies of your messages that other members’ devices already hold; ask the workspace’s members, or leave and ask its owner to remove you from the list.' },
       ],
     },
     {
       heading: '9. Cookies and local storage',
       blocks: [
-        { p: 'No cookies for tracking or advertising. Only essential local storage (localStorage/IndexedDB) for features you use. External sign-in may set the provider’s own cookies.' },
+        { p: 'Peerly sets one cookie, which carries your session to our servers, is readable only by them and lasts 30 minutes at a time. Local storage and IndexedDB hold what section 3 lists. All of it is needed for the service you asked for; there are no analytics or advertising cookies, so we do not ask for consent.' },
       ],
     },
     {
       heading: '10. Age',
-      blocks: [
-        { p: `Peerly is intended for people aged at least ${m.minAge}.` },
-      ],
+      blocks: [{ p: `Peerly is for people aged ${m.minAge} or over.` }],
     },
     {
       heading: '11. Security',
       blocks: [
-        { p: 'Durable event content is encrypted client-side (AES-GCM), P2P connections are encrypted (DTLS/SRTP), access is restricted to the signed membership list, and device and author identity is verified cryptographically. No system is 100% secure.' },
+        { p: 'Content is encrypted end to end with keys our servers never receive, and every change is signed by the device that made it; a device’s key cannot be copied out of its browser. Traffic to our servers uses HTTPS. Keep your devices locked and approve new devices only when they are yours: anyone with your unlocked device can read your workspaces.' },
       ],
     },
     {
       heading: '12. Changes',
-      blocks: [
-        { p: 'We may update this Policy; we will signal material changes in the app and ask you to accept again.' },
-      ],
+      blocks: [{ p: 'We will update this policy when Peerly changes what it processes, and show the date of the latest update at the top.' }],
     },
     {
       heading: '13. Contact',
+      blocks: [{ p: `${m.controller} · ${m.privacyEmail}` }],
+    },
+  ],
+}
+
+const privacyPl: LegalDoc = {
+  title: 'Polityka prywatności',
+  updated: updatedLabel.pl,
+  intro:
+    'Peerly to czat zespołowy w przestrzeniach dostępnych tylko dla zaproszonych. To, co piszesz, trafia bezpośrednio między urządzeniami członków (peer to peer) i jest szyfrowane od końca do końca. Nasze serwery logują Cię, wpuszczają do przestrzeni tylko osoby z jej listy, zapoznają ze sobą urządzenia członków, a gdy właściciel przestrzeni ma Premium, przechowują jej zaszyfrowaną historię. Ten dokument wyjaśnia, jakie dane się z tym wiążą i jakie masz prawa.',
+  sections: [
+    {
+      heading: '1. Administrator danych',
       blocks: [
-        { p: `Privacy: ${m.privacyEmail} · Abuse reports: ${m.abuseEmail}` },
+        { p: `Administratorem danych jest ${m.controller} (osoba fizyczna prowadząca Peerly), ${m.country}. Kontakt w sprawach prywatności: ${m.privacyEmail}.` },
       ],
+    },
+    {
+      heading: '2. Jak działa Peerly',
+      blocks: [
+        { p: 'Każda przestrzeń ma sekret utworzony na urządzeniu jej właściciela. Podróżuje on wyłącznie we fragmencie linku z zaproszeniem (część po znaku #, której przeglądarki nigdy nie wysyłają do serwera) i pozostaje na urządzeniach członków. Klucz szyfrujący treść przestrzeni pochodzi z tego sekretu, więc nasze serwery nie mogą ani odczytać treści, ani na jego podstawie odnaleźć przestrzeni.' },
+        { p: 'Właściciel podpisuje listę adresów e-mail przestrzeni kluczem swojego konta. Wejść mogą tylko osoby z tej listy, niezależnie od tego, kto ma link.' },
+        { p: 'Urządzenia członków łączą się bezpośrednio (WebRTC) i przekazują sobie wiadomości. Każde urządzenie zachowuje to, co otrzymało, i przekazuje to członkom, których spotka później, więc osoba, której nie było, nadrabia zaległości od tych, którzy są online. Bez Premium nic, co piszesz, nie jest przechowywane na naszych serwerach.' },
+      ],
+    },
+    {
+      heading: '3. Jakie dane są przetwarzane',
+      blocks: [
+        { p: 'Logowanie: logujesz się przez Google, Microsoft, Apple lub logowanie swojej organizacji (OpenID Connect). Przeglądarka wysyła nam raz token tożsamości dostawcy, abyśmy go zweryfikowali. Na naszych serwerach nie zachowujemy ani tokenu, ani Twojego adresu e-mail czy imienia. Z tokenu wyprowadzamy identyfikator konta (jednokierunkowy skrót dostawcy i Twojego konta u niego), identyfikator wewnętrzny (skrót identyfikatora konta z tajnym kluczem) oraz identyfikator członka (skrót adresu e-mail z tajnym kluczem), po którym rozpoznaje Cię lista przestrzeni. Imię, adres e-mail i adres zdjęcia z tokenu pozostają w Twojej przeglądarce, aby pokazać, kto jest zalogowany.' },
+        { p: 'Urządzenia i sesje: Twoje urządzenie tworzy własny klucz, który nie może opuścić przeglądarki; przechowujemy jego część publiczną, Twoje sesje (które urządzenie, do kiedy) i plik cookie przenoszący sesję. Gdy łączysz urządzenia, przechowujemy nazwę każdego z nich (przeglądarkę i system, które możesz zmienić), datę połączenia i ostatniej aktywności, jego certyfikat oraz klucze Twojego konta zapieczętowane dla każdego połączonego urządzenia, których nie możemy otworzyć.' },
+        { p: 'Wejście do przestrzeni: gdy otwierasz przestrzeń, Twoje urządzenie wysyła podpisaną przez właściciela listę adresów e-mail członków. Nasz Worker sprawdza podpis, wyprowadza identyfikator każdego członka i wpuszcza Cię, jeśli Twój jest wśród nich. Kanał przestrzeni zachowuje tylko te identyfikatory członków oraz identyfikator trasy wyprowadzony z sekretu przestrzeni (nie sam sekret); adresy e-mail nie są przechowywane.' },
+        { p: 'Gdy jesteś online: kanał przestrzeni (Cloudflare Durable Object) wie, które identyfikatory kont i urządzeń są połączone, i przekazuje zaszyfrowane wiadomości, imiona, informacje o pisaniu oraz zestawianie bezpośrednich połączeń między urządzeniami członków. Nie może ich odczytać.' },
+        { p: 'Treść: wiadomości, ich edycje i usunięcia, reakcje, nazwy kanałów i nazwa przestrzeni są podpisywane przez urządzenie, które je utworzyło, i szyfrowane. Trafiają bezpośrednio do urządzeń członków. Jeśli właściciel przestrzeni ma Premium, jej kanał przechowuje także zaszyfrowane kopie ostatnich 5000 zmian, aby członkowie otrzymali je po powrocie; ta historia kończy się wraz z Premium właściciela.' },
+        { p: 'Twoje imię w przestrzeni: imię, którym się logujesz, jest wysyłane w postaci zaszyfrowanej do członków, których spotykasz. Ich urządzenia zapamiętują imiona widziane w tej przestrzeni i mogą przekazać je członkom, którzy Cię jeszcze nie widzieli.' },
+        { p: 'Adres IP: aby połączyć się bezpośrednio, urządzenia członków wymieniają przez kanał przestrzeni swoje adresy sieciowe (kandydatów ICE), w tym publiczny adres, który ustala serwer STUN Cloudflare. Pozostali członkowie Twoich przestrzeni mogą więc poznać Twój adres IP, a z niego przybliżoną lokalizację i dostawcę internetu. Połączenia konta Premium mogą zamiast tego iść przez przekaźnik TURN Cloudflare; wtedy Twój adres IP i metadane połączenia widzi Cloudflare, a pozostali członkowie widzą adres przekaźnika. Przekazujemy te adresy tylko członkom tej samej przestrzeni i ich nie przechowujemy.' },
+        { p: 'Twój plan: przechowujemy identyfikator konta, datę pierwszego i ostatniego logowania (aktualizowaną najwyżej raz na godzinę), plan, datę jego zakończenia, kto z naszego zespołu go przyznał i kiedy oraz opcjonalną notatkę. Nasz zespół odnajduje konto po identyfikatorze widocznym w Ustawieniach, który podajesz, pytając o swój plan.' },
+        { p: 'Diagnostyka: dla każdego żądania obsłużonego przez usługę zapisujemy, jaka operacja została wykonana, jej wynik, czas trwania i wersję aplikacji. Gdy coś się nie powiedzie, zachowujemy też komunikat błędu, miejsce w kodzie, w którym wystąpił, oraz wpisy dziennika usługi dla tego żądania; te zapisy nie zawierają adresów IP, treści żądań ani wiadomości. Niezależnie od tego Cloudflare w dziennikach naszej usługi przechowuje przez 7 dni techniczne szczegóły każdego żądania, w tym Twój adres IP i identyfikację przeglądarki (user agent), w celach bezpieczeństwa i diagnozowania problemów.' },
+        { p: 'Raporty błędów: jeśli aplikacja zawiedzie w Twojej przeglądarce, wysyła nam komunikat błędu i miejsce w kodzie aplikacji, w którym wystąpił, stronę, na której to się stało, wersję aplikacji oraz nazwę i główną wersję przeglądarki, system operacyjny i rodzaj urządzenia. Adresy e-mail, parametry zapytań w linkach i długie identyfikatory są wcześniej usuwane. Raport nie zawiera adresu IP, pliku cookie ani identyfikatora.' },
+        { p: 'Odsłony: każda strona aplikacji wysyła anonimową odsłonę: którą stronę otwarto (nigdy przestrzeń, kanał ani konto), jaka strona lub kampania Cię skierowała, czy odsłona pochodzi z zalogowanego konta oraz czy urządzenie to telefon, tablet czy komputer. Usługa dodaje kraj, region i miasto, które Cloudflare szacuje na podstawie połączenia. Odsłony nie zawierają adresu IP, pliku cookie ani identyfikatora, więc nie da się ich powiązać ze sobą ani z Tobą; liczymy je wyłącznie łącznie.' },
+        { p: 'Na Twoim urządzeniu: Twoje przestrzenie (ich sekrety i listy członków), wiadomości i zmiany, które ma urządzenie, imiona, które widziało, klucz urządzenia i, po połączeniu, klucze Twojego konta (w IndexedDB); kto jest zalogowany, wybrany motyw, język i format zegara (w pamięci lokalnej); niewysłane szkice (tylko w tej karcie) oraz pliki aplikacji, aby otwierała się offline (w pamięci podręcznej service workera).' },
+        { note: 'Bez reklam, pikseli śledzących, identyfikatorów odwiedzających i profilowania. Nie sprzedajemy danych.' },
+      ],
+    },
+    {
+      heading: '4. Podstawy prawne (RODO art. 6)',
+      blocks: [
+        { ul: [
+          'Wykonanie usługi, o którą prosisz (art. 6 ust. 1 lit. b): logowanie, sprawdzanie listy przestrzeni, łączenie urządzeń członków, historia i przekaźnik przestrzeni Premium, Twój plan.',
+          'Prawnie uzasadniony interes (art. 6 ust. 1 lit. f): bezpieczeństwo, zapobieganie nadużyciom, diagnostyka i raporty błędów, aby usługa działała, oraz łączne liczenie odsłon.',
+          'Właściciele przestrzeni decydują, czyje adresy e-mail są na ich listach, i potrzebują własnej podstawy, aby zapraszać te osoby.',
+        ] },
+      ],
+    },
+    {
+      heading: '5. Kto może zobaczyć Twoje dane',
+      blocks: [
+        { ul: [
+          'Członkowie Twoich przestrzeni: Twoje imię, to, co tam piszesz, kiedy jesteś online oraz Twój adres IP, gdy Wasze urządzenia łączą się bezpośrednio. Członkowie widzą listę adresów e-mail przestrzeni.',
+          'Cloudflare, które utrzymuje usługę: zaszyfrowaną treść, identyfikatory kont i urządzeń, metadane połączeń i adresy IP (dzienniki żądań, STUN, TURN); nie klucze do treści.',
+          'Nasz zespół w CodeFusion Console (narzędziu administracyjnym operatora, również na Cloudflare): Twój identyfikator konta, daty pierwszego i ostatniego logowania oraz Twój plan; diagnostykę i raporty błędów.',
+          'Dostawca, przez którego się logujesz, który wie, że zalogowano się do Peerly.',
+        ] },
+      ],
+    },
+    {
+      heading: '6. Podmioty przetwarzające',
+      blocks: [
+        { ul: [
+          'Cloudflare Workers i Durable Objects: logowanie, sesje, urządzenia, kanały przestrzeni, zaszyfrowana historia, plany.',
+          'Cloudflare STUN i TURN: ustalanie publicznego adresu urządzenia do połączeń bezpośrednich i przekazywanie połączeń kont Premium.',
+          'Cloudflare Static Assets: serwowanie plików aplikacji.',
+          'Cloudflare Workers Analytics Engine i D1, przez CodeFusion Console: diagnostyka, raporty błędów i liczba odsłon.',
+          'Dostawcy tożsamości (Google, Microsoft, Apple lub Twojej organizacji): logowanie.',
+        ] },
+        { p: 'Cloudflare może przetwarzać dane poza Europejskim Obszarem Gospodarczym na podstawie standardowych klauzul umownych UE oraz programu EU–US Data Privacy Framework.' },
+      ],
+    },
+    {
+      heading: '7. Okres przechowywania',
+      blocks: [
+        { ul: [
+          'Na Twoich urządzeniach: do opuszczenia przestrzeni, wyczyszczenia wiadomości w Ustawieniach → Pamięć lub wyczyszczenia danych przeglądarki. Wylogowanie je zachowuje na czas ponownego zalogowania.',
+          'Sesje: do wygaśnięcia (30 dni bez używania) lub wylogowania. Połączone urządzenia: do ich odłączenia.',
+          'Identyfikatory członków przestrzeni: dopóki przestrzeń jest używana; nowsza lista je zastępuje.',
+          'Historia przestrzeni Premium: ostatnie 5000 zmian, dopóki trwa Premium właściciela; jest usuwana, gdy Premium się kończy.',
+          'Identyfikator konta, urządzenia i plan: dopóki nie poprosisz o usunięcie konta.',
+          'Raporty błędów: 30 dni; statystyki żądań, diagnostyki i odsłon: 3 miesiące; dzienniki żądań Cloudflare: 7 dni.',
+        ] },
+      ],
+    },
+    {
+      heading: '8. Twoje prawa',
+      blocks: [
+        { p: `Możesz żądać dostępu do swoich danych, ich sprostowania lub usunięcia, ograniczenia przetwarzania i kopii (przenoszenia) oraz sprzeciwić się przetwarzaniu opartemu na prawnie uzasadnionym interesie. Napisz na ${m.privacyEmail} i podaj identyfikator konta z Ustawień: nie przechowujemy adresu e-mail, po którym moglibyśmy Cię odnaleźć. Możesz też złożyć skargę do Prezesa Urzędu Ochrony Danych Osobowych.` },
+        { p: 'Nie możemy usunąć kopii Twoich wiadomości, które mają już urządzenia innych członków; poproś o to członków przestrzeni albo ją opuść i poproś właściciela o usunięcie Cię z listy.' },
+      ],
+    },
+    {
+      heading: '9. Pliki cookie i pamięć lokalna',
+      blocks: [
+        { p: 'Peerly ustawia jeden plik cookie, który przenosi Twoją sesję do naszych serwerów, jest czytelny tylko dla nich i obowiązuje każdorazowo przez 30 minut. Pamięć lokalna i IndexedDB przechowują to, co wymienia punkt 3. Wszystko to jest niezbędne do świadczenia usługi, o którą prosisz; nie ma plików cookie analitycznych ani reklamowych, więc nie prosimy o zgodę.' },
+      ],
+    },
+    {
+      heading: '10. Wiek',
+      blocks: [{ p: `Peerly jest dla osób, które ukończyły ${m.minAge} lat.` }],
+    },
+    {
+      heading: '11. Bezpieczeństwo',
+      blocks: [
+        { p: 'Treść jest szyfrowana od końca do końca kluczami, których nasze serwery nigdy nie otrzymują, a każda zmiana jest podpisana przez urządzenie, które ją wprowadziło; klucza urządzenia nie da się skopiować z przeglądarki. Połączenia z naszymi serwerami używają HTTPS. Blokuj swoje urządzenia i zatwierdzaj nowe tylko wtedy, gdy są Twoje: każdy, kto ma Twoje odblokowane urządzenie, może czytać Twoje przestrzenie.' },
+      ],
+    },
+    {
+      heading: '12. Zmiany',
+      blocks: [{ p: 'Zaktualizujemy tę politykę, gdy Peerly zmieni zakres przetwarzanych danych, a datę ostatniej aktualizacji pokażemy na górze.' }],
+    },
+    {
+      heading: '13. Kontakt',
+      blocks: [{ p: `${m.controller} · ${m.privacyEmail}` }],
     },
   ],
 }
@@ -243,41 +264,6 @@ const privacyEn: LegalDoc = {
 // Terms of Service
 // ---------------------------------------------------------------------------
 
-const termsPl: LegalDoc = {
-  title: 'Regulamin',
-  updated: updatedLabel.pl,
-  intro: 'Niniejszy Regulamin określa zasady korzystania z Peerly. Korzystając z aplikacji, akceptujesz te zasady.',
-  sections: [
-    { heading: '1. Akceptacja', blocks: [{ p: 'Korzystanie z Peerly oznacza akceptację niniejszego Regulaminu oraz Polityki prywatności. Jeśli się nie zgadzasz, nie korzystaj z aplikacji.' }] },
-    { heading: '2. Wiek', blocks: [{ p: `Musisz mieć co najmniej ${m.minAge} lat.` }] },
-    { heading: '3. Charakter usługi', blocks: [{ p: 'Peerly to aplikacja hybrydowa: zaszyfrowane wiadomości i zdarzenia są dostarczane i czasowo przechowywane przez Durable Objects, a pliki i połączenia pozostają P2P. Dostarczamy oprogramowanie „takie, jakie jest”. Nie możemy odczytać ani centralnie moderować zaszyfrowanych treści i nie gwarantujemy dostępności ani jakości połączeń.' }] },
-    { heading: '4. Twoja tożsamość i przestrzenie', blocks: [
-      { p: 'Logujesz się przez zewnętrznego dostawcę tożsamości. Twórca przestrzeni decyduje, które adresy e-mail mogą dołączyć, i odpowiada za zgodność zaproszeń z prawem (np. za podstawę do przetwarzania adresów e-mail zaproszonych osób). Odpowiadasz za zachowanie kontroli nad swoim urządzeniem i kontem.' },
-    ] },
-    { heading: '5. Dozwolone korzystanie', blocks: [
-      { p: 'Zobowiązujesz się nie używać Peerly do:' },
-      { ul: [
-        'działań niezgodnych z prawem lub naruszających prawa innych osób;',
-        'treści nielegalnych, w tym materiałów przedstawiających wykorzystywanie dzieci (CSAM) — bezwzględnie zakazanych i zgłaszanych organom;',
-        'nękania, gróźb ani mowy nienawiści;',
-        'rozpowszechniania złośliwego oprogramowania, spamu ani prób obejścia zabezpieczeń;',
-        'naruszania praw autorskich lub innych praw osób trzecich.',
-      ] },
-    ] },
-    { heading: '6. Twoje treści i odpowiedzialność', blocks: [
-      { p: 'Odpowiadasz za treści, które udostępniasz w przestrzeniach. Usunięcie zaszyfrowanej kopii serwerowej nie usuwa kopii, które zostały już zapisane na urządzeniach odbiorców.' },
-    ] },
-    { heading: '7. Własność i licencja', blocks: [{ p: 'Kod aplikacji jest udostępniany na licencji open source (MIT). Zachowujesz prawa do własnych treści.' }] },
-    { heading: '8. Wyłączenie gwarancji', blocks: [{ p: 'Usługa dostarczana jest „tak, jak jest”, bez jakichkolwiek gwarancji, w tym co do dostępności, bezpieczeństwa czy zachowania innych uczestników.' }] },
-    { heading: '9. Ograniczenie odpowiedzialności', blocks: [{ p: 'W maksymalnym zakresie dozwolonym przez prawo nie ponosimy odpowiedzialności za szkody wynikające z korzystania z aplikacji, w tym za treści i zachowanie innych uczestników. Nie wyłącza to odpowiedzialności, której nie można wyłączyć zgodnie z prawem (np. wobec konsumentów).' }] },
-    { heading: '10. Zgłaszanie nadużyć i treści nielegalnych', blocks: [{ p: `Nielegalne treści lub nadużycia zgłaszaj na ${m.abuseEmail}. Przechowywane koperty są zaszyfrowane i nie możemy ich odczytać ani moderować, ale reagujemy w zakresie, w jakim jest to możliwe, i współpracujemy z właściwymi organami.` }] },
-    { heading: '11. Zawieszenie dostępu', blocks: [{ p: 'Możemy ograniczyć lub odciąć dostęp do prowadzonej przez nas infrastruktury (np. przekaźnika) w razie naruszeń Regulaminu.' }] },
-    { heading: '12. Prawo właściwe', blocks: [{ p: `Regulamin podlega prawu ${m.governingLaw}. Nie narusza to bezwzględnie obowiązujących praw konsumenta w kraju jego zamieszkania.` }] },
-    { heading: '13. Zmiany', blocks: [{ p: 'Możemy aktualizować Regulamin; istotne zmiany zasygnalizujemy i poprosimy o ponowną akceptację.' }] },
-    { heading: '14. Kontakt', blocks: [{ p: `Kontakt: ${m.privacyEmail} · Nadużycia: ${m.abuseEmail}` }] },
-  ],
-}
-
 const termsEn: LegalDoc = {
   title: 'Terms of Service',
   updated: updatedLabel.en,
@@ -285,31 +271,78 @@ const termsEn: LegalDoc = {
   sections: [
     { heading: '1. Acceptance', blocks: [{ p: 'Using Peerly means you accept these Terms and the Privacy Policy. If you disagree, do not use the app.' }] },
     { heading: '2. Age', blocks: [{ p: `You must be at least ${m.minAge}.` }] },
-    { heading: '3. Nature of the service', blocks: [{ p: 'Peerly is a hybrid app: encrypted messages and events are delivered and temporarily retained by Durable Objects, while files and calls remain P2P. We provide the software “as is”. We cannot read or centrally moderate encrypted content and do not guarantee availability or connection quality.' }] },
-    { heading: '4. Your identity and workspaces', blocks: [
-      { p: 'You sign in through a third-party identity provider. The workspace creator decides which email addresses may join and is responsible for the lawfulness of invitations (including a basis for processing invited people’s email addresses). You are responsible for keeping control of your device and account.' },
+    { heading: '3. The service', blocks: [
+      { p: 'Peerly connects the members of invite-only workspaces. Their devices pass what they write directly to each other, so without Premium a message reaches a member only while someone who has it is online.' },
+      { p: 'Premium keeps the encrypted history of the workspaces you own on our servers, so members get it whenever they come back, and lets your connections go through a relay when a direct one fails. Our team grants Premium for now, for the time it states, and may end it; we will tell you before charging for anything.' },
     ] },
-    { heading: '5. Acceptable use', blocks: [
+    { heading: '4. Your account and devices', blocks: [
+      { p: 'You sign in through a third-party identity provider and are responsible for your account and the devices you approve. Approve a new device only when it is yours: a linked device holds your account’s keys and can change the lists of workspaces you own.' },
+    ] },
+    { heading: '5. Workspaces', blocks: [
+      { p: 'A workspace’s owner decides which email addresses may join and is responsible for the lawfulness of those invitations. An invite link carries the workspace’s key: share it only with the people the list names. Removing someone from the list stops them entering again; it cannot take back what their devices already received.' },
+    ] },
+    { heading: '6. Acceptable use', blocks: [
       { p: 'You agree not to use Peerly for:' },
       { ul: [
         'unlawful activity or violating others’ rights;',
-        'illegal content, including child sexual abuse material (CSAM) — strictly forbidden and reported to the authorities;',
-        'harassment, threats, or hate speech;',
-        'distributing malware or spam, or attempts to circumvent safeguards;',
+        'illegal content, including child sexual abuse material (CSAM), which is strictly forbidden and reported to the authorities;',
+        'harassment, threats or hate speech;',
+        'distributing malware or spam, or attempts to get around safeguards, limits or other people’s access;',
         'infringing copyright or other third-party rights.',
       ] },
     ] },
-    { heading: '6. Your content and responsibility', blocks: [
-      { p: 'You are responsible for the content you share in workspaces. Removing an encrypted server-held copy does not remove copies already stored on recipients’ devices.' },
+    { heading: '7. Your content', blocks: [
+      { p: 'You keep the rights to what you write and are responsible for it. Deleting a message removes it for members whose devices receive the deletion; copies made elsewhere stay where they are.' },
     ] },
-    { heading: '7. Ownership and license', blocks: [{ p: 'The app code is released under an open-source license (MIT). You keep the rights to your own content.' }] },
-    { heading: '8. Disclaimer of warranties', blocks: [{ p: 'The service is provided “as is”, without warranties of any kind, including as to availability, security, or the conduct of other participants.' }] },
-    { heading: '9. Limitation of liability', blocks: [{ p: 'To the maximum extent permitted by law, we are not liable for damages arising from use of the app, including the content and conduct of other participants. This does not exclude liability that cannot be excluded by law (e.g. towards consumers).' }] },
-    { heading: '10. Reporting abuse and illegal content', blocks: [{ p: `Report illegal content or abuse to ${m.abuseEmail}. Stored envelopes are encrypted and cannot be read or moderated by us, but we act to the extent we can and cooperate with the competent authorities.` }] },
-    { heading: '11. Suspension of access', blocks: [{ p: 'We may restrict or cut off access to infrastructure we operate (such as a relay) in the event of Terms violations.' }] },
-    { heading: '12. Governing law', blocks: [{ p: `These Terms are governed by the law of ${m.governingLaw}. This does not affect mandatory consumer-protection rights in your country of residence.` }] },
-    { heading: '13. Changes', blocks: [{ p: 'We may update these Terms; we will signal material changes and ask you to accept again.' }] },
-    { heading: '14. Contact', blocks: [{ p: `Contact: ${m.privacyEmail} · Abuse: ${m.abuseEmail}` }] },
+    { heading: '8. Ownership and license', blocks: [{ p: 'Peerly’s code is open source under the MIT license.' }] },
+    { heading: '9. Disclaimer of warranties', blocks: [{ p: 'The service is provided “as is”, without warranties of any kind, including as to availability, delivery of messages, security, or the conduct of other members.' }] },
+    { heading: '10. Limitation of liability', blocks: [{ p: 'To the maximum extent permitted by law, we are not liable for damages arising from use of the app, including the content and conduct of other members. This does not exclude liability that cannot be excluded by law, such as towards consumers.' }] },
+    { heading: '11. Reporting abuse and illegal content', blocks: [{ p: `Report illegal content or abuse to ${m.abuseEmail}. We cannot read workspaces’ content, but we act to the extent we can, including closing accounts and their access, and cooperate with the competent authorities.` }] },
+    { heading: '12. Suspension', blocks: [{ p: 'We may suspend or close an account that breaks these Terms, and end its Premium.' }] },
+    { heading: '13. Governing law', blocks: [{ p: `These Terms are governed by the law of ${m.governingLaw}. This does not affect mandatory consumer-protection rights in your country of residence.` }] },
+    { heading: '14. Changes', blocks: [{ p: 'We may update these Terms; we will signal material changes and ask you to accept them again.' }] },
+    { heading: '15. Contact', blocks: [{ p: `Contact: ${m.privacyEmail} · Abuse: ${m.abuseEmail}` }] },
+  ],
+}
+
+const termsPl: LegalDoc = {
+  title: 'Regulamin',
+  updated: updatedLabel.pl,
+  intro: 'Niniejszy Regulamin określa zasady korzystania z Peerly. Korzystając z aplikacji, akceptujesz te zasady.',
+  sections: [
+    { heading: '1. Akceptacja', blocks: [{ p: 'Korzystanie z Peerly oznacza akceptację niniejszego Regulaminu oraz Polityki prywatności. Jeśli się nie zgadzasz, nie korzystaj z aplikacji.' }] },
+    { heading: '2. Wiek', blocks: [{ p: `Musisz mieć co najmniej ${m.minAge} lat.` }] },
+    { heading: '3. Usługa', blocks: [
+      { p: 'Peerly łączy członków przestrzeni dostępnych tylko dla zaproszonych. Ich urządzenia przekazują sobie bezpośrednio to, co piszą, więc bez Premium wiadomość dociera do członka tylko wtedy, gdy ktoś, kto ją ma, jest online.' },
+      { p: 'Premium przechowuje na naszych serwerach zaszyfrowaną historię przestrzeni należących do Ciebie, aby członkowie otrzymywali ją po powrocie, i pozwala Twoim połączeniom iść przez przekaźnik, gdy bezpośrednie się nie uda. Na razie Premium przyznaje nasz zespół, na wskazany przez siebie czas, i może je zakończyć; zanim zaczniemy za cokolwiek pobierać opłaty, poinformujemy Cię o tym.' },
+    ] },
+    { heading: '4. Twoje konto i urządzenia', blocks: [
+      { p: 'Logujesz się przez zewnętrznego dostawcę tożsamości i odpowiadasz za swoje konto oraz zatwierdzane urządzenia. Zatwierdzaj nowe urządzenie tylko wtedy, gdy jest Twoje: połączone urządzenie ma klucze Twojego konta i może zmieniać listy przestrzeni należących do Ciebie.' },
+    ] },
+    { heading: '5. Przestrzenie', blocks: [
+      { p: 'Właściciel przestrzeni decyduje, które adresy e-mail mogą dołączyć, i odpowiada za zgodność tych zaproszeń z prawem. Link z zaproszeniem zawiera klucz przestrzeni: udostępniaj go tylko osobom z listy. Usunięcie kogoś z listy uniemożliwia mu ponowne wejście; nie odbiera tego, co jego urządzenia już otrzymały.' },
+    ] },
+    { heading: '6. Dozwolone korzystanie', blocks: [
+      { p: 'Zobowiązujesz się nie używać Peerly do:' },
+      { ul: [
+        'działań niezgodnych z prawem lub naruszających prawa innych osób;',
+        'treści nielegalnych, w tym materiałów przedstawiających wykorzystywanie seksualne dzieci (CSAM), które są bezwzględnie zakazane i zgłaszane organom;',
+        'nękania, gróźb ani mowy nienawiści;',
+        'rozpowszechniania złośliwego oprogramowania lub spamu ani prób obchodzenia zabezpieczeń, limitów lub dostępu innych osób;',
+        'naruszania praw autorskich lub innych praw osób trzecich.',
+      ] },
+    ] },
+    { heading: '7. Twoje treści', blocks: [
+      { p: 'Zachowujesz prawa do tego, co piszesz, i za to odpowiadasz. Usunięcie wiadomości usuwa ją u członków, których urządzenia otrzymają to usunięcie; kopie wykonane gdzie indziej pozostają tam, gdzie są.' },
+    ] },
+    { heading: '8. Własność i licencja', blocks: [{ p: 'Kod Peerly jest udostępniany na otwartej licencji MIT.' }] },
+    { heading: '9. Wyłączenie gwarancji', blocks: [{ p: 'Usługa dostarczana jest „tak, jak jest”, bez jakichkolwiek gwarancji, w tym co do dostępności, dostarczania wiadomości, bezpieczeństwa czy zachowania innych członków.' }] },
+    { heading: '10. Ograniczenie odpowiedzialności', blocks: [{ p: 'W maksymalnym zakresie dozwolonym przez prawo nie ponosimy odpowiedzialności za szkody wynikające z korzystania z aplikacji, w tym za treści i zachowanie innych członków. Nie wyłącza to odpowiedzialności, której nie można wyłączyć zgodnie z prawem, np. wobec konsumentów.' }] },
+    { heading: '11. Zgłaszanie nadużyć i treści nielegalnych', blocks: [{ p: `Nielegalne treści lub nadużycia zgłaszaj na ${m.abuseEmail}. Nie możemy odczytać treści przestrzeni, ale reagujemy w zakresie, w jakim to możliwe, w tym zamykając konta i ich dostęp, i współpracujemy z właściwymi organami.` }] },
+    { heading: '12. Zawieszenie', blocks: [{ p: 'Możemy zawiesić lub zamknąć konto naruszające Regulamin i zakończyć jego Premium.' }] },
+    { heading: '13. Prawo właściwe', blocks: [{ p: `Regulamin podlega prawu ${m.governingLaw}. Nie narusza to bezwzględnie obowiązujących praw konsumenta w kraju jego zamieszkania.` }] },
+    { heading: '14. Zmiany', blocks: [{ p: 'Możemy aktualizować Regulamin; istotne zmiany zasygnalizujemy i poprosimy o ich ponowną akceptację.' }] },
+    { heading: '15. Kontakt', blocks: [{ p: `Kontakt: ${m.privacyEmail} · Nadużycia: ${m.abuseEmail}` }] },
   ],
 }
 

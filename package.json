@@ -46,7 +46,8 @@
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "worker:check": "wrangler types --check && wrangler types worker-configuration.preview.d.ts -c wrangler.preview.jsonc --env-interface PreviewEnv --check && wrangler deploy --dry-run --env='' && wrangler deploy --dry-run -c wrangler.preview.jsonc",
     "deploy:preview": "wrangler deploy -c wrangler.preview.jsonc",
-    "test:bump": "node --test scripts/bump-version.test.mjs"
+    "test:bump": "node --test scripts/bump-version.test.mjs",
+    "legal:export": "node scripts/export-legal.mjs"
   },
   "dependencies": {
     "@codefusion-cc/app-update": "^1.1.0",
