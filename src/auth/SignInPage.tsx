@@ -7,6 +7,7 @@ import { useI18n } from '../i18nContext.ts'
 import { navigate } from '../router.ts'
 import { ProviderIcon } from './ProviderIcon.tsx'
 import { startRedirectSignIn, takeRedirectSignInResult, type RedirectSignInOption } from './redirectSignIn.ts'
+import { recordSignIn } from '../console.ts'
 import { completeSignIn, device, SignInError, type ProviderId } from './session.ts'
 
 type ProviderOption = { id: 'google'; clientId: string } | (RedirectSignInOption & { label?: string })
@@ -50,6 +51,7 @@ export function SignInPage() {
     setError(null)
     try {
       await completeSignIn(credential, provider)
+      recordSignIn()
       navigate(nextPath(location.search), { replace: true })
     } catch (failure) {
       const reason = failure instanceof SignInError ? failure.reason : 'unavailable'

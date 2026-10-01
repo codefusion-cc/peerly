@@ -20,26 +20,42 @@
   "secrets": {
     "required": ["NETWORK_SESSION_SECRET", "OPAQUE_USER_ID_SECRET", "TURN_KEY_ID", "TURN_KEY_API_TOKEN"]
   },
+  // CodeFusion Console reads every invocation (Failures, Health, Logs) and files this Worker as production.
+  // It keeps no IPs, headers, query strings or bodies.
+  "tail_consumers": [{ "service": "codefusion-console" }],
+  // Errors from Peerly's pages, for the console's Failures (createConsoleRoutes, worker/index.ts).
+  "services": [
+    { "binding": "CONSOLE_TELEMETRY", "service": "codefusion-console", "entrypoint": "AppTelemetry" }
+  ],
+  // Anonymous page view counts for the console's Visits page: no visitor id, IP or user agent.
+  "analytics_engine_datasets": [
+    { "binding": "VISITS", "dataset": "cfc_visits" }
+  ],
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    // With privateSourceMaps(): the Worker answers /_console/*, so the source maps stay private.
+    "run_worker_first": ["/api/*", "/_console/*"]
   },
   "ratelimits": [
     { "name": "AUTH_RATE_LIMITER", "namespace_id": "1005", "simple": { "limit": 10, "period": 60 } },
     { "name": "AUTH_IP_RATE_LIMITER", "namespace_id": "1006", "simple": { "limit": 60, "period": 60 } },
+    // Error reports from pages, per connection.
+    { "name": "BROWSER_FAILURE_RATE_LIMITER", "namespace_id": "1009", "simple": { "limit": 10, "period": 60 } },
     { "name": "MEDIA_RATE_LIMITER", "namespace_id": "1007", "simple": { "limit": 6, "period": 60 } }
   ],
   "durable_objects": {
     "bindings": [
       { "name": "USER_GATEWAYS", "class_name": "UserGateway" },
-      { "name": "CHANNELS", "class_name": "Channel" }
+      { "name": "CHANNELS", "class_name": "Channel" },
+      // Accounts and their plans, for staff in CodeFusion Console (membershipGateway keeps it).
+      { "name": "ACCOUNT_DIRECTORY", "class_name": "AccountDirectory" }
     ]
   },
   // Production had no Durable Objects before 2.0: these apply with the first full deploy (merge to main).
   "migrations": [
-    { "tag": "v2-1", "new_sqlite_classes": ["UserGateway", "Channel"] }
+    { "tag": "v2-1", "new_sqlite_classes": ["UserGateway", "Channel", "AccountDirectory"] }
   ],
   "observability": { "enabled": true, "head_sampling_rate": 1 }
 }

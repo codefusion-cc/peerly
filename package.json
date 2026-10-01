@@ -49,7 +49,8 @@
     "test:bump": "node --test scripts/bump-version.test.mjs"
   },
   "dependencies": {
-    "@codefusion-cc/console": "^0.10.0",
+    "@codefusion-cc/app-update": "^1.1.0",
+    "@codefusion-cc/console": "^0.11.1",
     "@codefusion-cc/google-sign-in": "^1.0.0",
     "@codefusion-cc/realtime": "^1.1.0",
     "@codefusion-cc/realtime-media": "^1.1.0",

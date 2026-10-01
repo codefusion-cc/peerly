@@ -28,10 +28,11 @@
   "durable_objects": {
     "bindings": [
       { "name": "USER_GATEWAYS", "class_name": "UserGateway" },
-      { "name": "CHANNELS", "class_name": "Channel" }
+      { "name": "CHANNELS", "class_name": "Channel" },
+      { "name": "ACCOUNT_DIRECTORY", "class_name": "AccountDirectory" }
     ]
   },
   "migrations": [
-    { "tag": "v2-1", "new_sqlite_classes": ["UserGateway", "Channel"] }
+    { "tag": "v2-1", "new_sqlite_classes": ["UserGateway", "Channel", "AccountDirectory"] }
   ]
 }

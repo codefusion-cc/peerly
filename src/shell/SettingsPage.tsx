@@ -1,7 +1,7 @@
 import { canLinkThisDevice, DEVICE_NAME_MAX, formatByteSize, type LinkedDevice } from '@codefusion-cc/realtime/browser'
 import { useBusyAction, useClockFormat } from '@codefusion-cc/realtime/react'
 import {
-  ArrowLeft, Cloud, Database, HardDrive, KeyRound, Laptop, LogOut, Palette, Radio, ShieldCheck, Smartphone, Sparkles, Tablet, User,
+  ArrowLeft, Check, Cloud, Copy, Database, HardDrive, KeyRound, Laptop, LogOut, Palette, Radio, ShieldCheck, Smartphone, Sparkles, Tablet, User,
 } from 'lucide-react'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useDevices } from '../account/devicesContext.ts'
@@ -91,6 +91,7 @@ function AccountSection({ account }: { account: Account }) {
             <p className="text-xs text-base-content/50">{t.signedInWith(t.providerNames[account.provider])}</p>
           </div>
         </div>
+        <AccountId userId={account.userId} />
         <button type="button" className="btn btn-outline btn-sm mt-5" onClick={() => setLeaving(true)}>
           <LogOut className="size-4" aria-hidden="true" />{t.signOut}
         </button>
@@ -123,6 +124,33 @@ function AccountSection({ account }: { account: Account }) {
       <ConfirmDialog open={leaving} onClose={() => setLeaving(false)} title={t.signOut} body={t.signOutConfirm}
         action={t.signOut} onConfirm={() => signOut()} />
     </>
+  )
+}
+
+/** The id staff find this account by (premium, support): Peerly keeps no email to look people up. */
+function AccountId({ userId }: { userId: string }) {
+  const { t } = useI18n()
+  const [copied, setCopied] = useState<boolean | null>(null)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(userId)
+      setCopied(true)
+      setTimeout(() => setCopied(null), 2_000)
+    } catch {
+      setCopied(false)
+    }
+  }
+  return (
+    <div className="mt-4 rounded-field bg-base-200 p-3">
+      <p className="text-xs font-medium text-base-content/70" id="account-id-label">{t.accountId}</p>
+      <div className="mt-1 flex items-center gap-2">
+        <code className="min-w-0 flex-1 truncate font-mono text-sm" aria-labelledby="account-id-label">{userId}</code>
+        <button type="button" className="btn btn-ghost btn-xs" onClick={() => void copy()}>
+          {copied ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}{copied ? t.copied : t.copy}
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-base-content/60" role={copied === false ? 'alert' : undefined}>{copied === false ? t.copyFailed : t.accountIdHint}</p>
+    </div>
   )
 }
 

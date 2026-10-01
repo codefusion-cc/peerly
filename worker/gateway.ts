@@ -14,7 +14,7 @@ export const CHANNEL_BINDING = 'CHANNELS'
 export const UserGateway = defineUserGateway(combineGatewayApps(
   workspaceGateway(env => (env[CHANNEL_BINDING] as never) ?? null),
   accountDevicesGateway({ scheme: APP_ID }),
-  membershipGateway({ plans: PLANS }),
+  membershipGateway({ plans: PLANS, directory: 'ACCOUNT_DIRECTORY' }),
   mediaGateway({
     rooms: CHANNEL_BINDING,
     // A call's statistics say whether the connection was a premium account's.

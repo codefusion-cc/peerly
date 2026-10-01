@@ -1,0 +1,102 @@
+{
+  "$schema": "../../node_modules/@codefusion-cc/console/app-manifest.schema.json",
+  "manifestVersion": 1,
+  "app": {
+    "id": "peerly",
+    "name": "Peerly",
+    "description": "Accounts and their plans. Peerly keeps no email or name: find a person by the account ID they read to you from Settings."
+  },
+  "resources": [
+    {
+      "key": "accounts",
+      "label": "Account",
+      "labelPlural": "Accounts",
+      "icon": "users",
+      "description": "Everyone who has signed in, by account ID, with the plan staff gave them.",
+      "permission": "records:read",
+      "idKey": "userId",
+      "titleKey": "userId",
+      "fields": [
+        { "key": "userId", "label": "Account ID", "type": "id", "description": "Shown to the person in Settings → Account." },
+        {
+          "key": "plan", "label": "Plan", "type": "enum",
+          "options": [
+            { "value": "premium", "label": "Premium", "tone": "success" },
+            { "value": "free", "label": "Free", "tone": "neutral" }
+          ]
+        },
+        { "key": "planUntil", "label": "Premium until", "type": "datetime", "description": "Empty: no end date." },
+        { "key": "grantedBy", "label": "Granted by", "type": "text", "sensitive": true },
+        { "key": "grantedAt", "label": "Granted", "type": "datetime" },
+        { "key": "createdAt", "label": "First seen", "type": "datetime" },
+        { "key": "lastSeenAt", "label": "Last seen", "type": "datetime" }
+      ],
+      "list": {
+        "columns": ["userId", "plan", "planUntil", "lastSeenAt"],
+        "secondary": ["createdAt"],
+        "search": { "placeholder": "Account ID, or how it starts" },
+        "filters": [
+          {
+            "key": "plan", "label": "Plan", "type": "enum",
+            "options": [
+              { "value": "premium", "label": "Premium", "tone": "success" },
+              { "value": "free", "label": "Free", "tone": "neutral" }
+            ]
+          }
+        ],
+        "sortable": ["lastSeenAt", "createdAt"],
+        "defaultSort": { "key": "lastSeenAt", "dir": "desc" },
+        "pageSize": 25
+      },
+      "detail": {
+        "badge": "plan",
+        "sections": [
+          { "title": "Account", "fields": ["userId", "createdAt", "lastSeenAt"] },
+          { "title": "Plan", "fields": ["plan", "planUntil", "grantedBy", "grantedAt"] }
+        ]
+      },
+      "actions": [
+        {
+          "key": "grant-premium",
+          "label": "Grant premium",
+          "icon": "star",
+          "scope": ["record", "bulk"],
+          "primary": true,
+          "permission": "records:manage",
+          "inputs": [
+            {
+              "key": "length", "label": "For", "type": "enum", "required": true, "default": "1y",
+              "options": [
+                { "value": "1m", "label": "1 month" },
+                { "value": "3m", "label": "3 months" },
+                { "value": "1y", "label": "1 year" },
+                { "value": "forever", "label": "No end date" }
+              ]
+            },
+            { "key": "note", "label": "Note", "type": "text", "placeholder": "Why, for whoever looks next" }
+          ],
+          "confirm": {
+            "title": "Grant premium?",
+            "message": "History is kept for the workspaces this person owns, their files go to the cloud, and their calls and connections may relay. Their open tabs change at once.",
+            "confirmLabel": "Grant premium"
+          }
+        },
+        {
+          "key": "end-premium",
+          "label": "End premium",
+          "icon": "x",
+          "tone": "danger",
+          "scope": ["record", "bulk"],
+          "permission": "records:manage",
+          "requireReason": true,
+          "visibleWhen": { "key": "plan", "in": ["premium"] },
+          "confirm": {
+            "title": "End premium now?",
+            "message": "History and cloud files stop for the workspaces this person owns, and their connections stop relaying. Their open tabs change at once.",
+            "confirmLabel": "End premium"
+          }
+        }
+      ]
+    }
+  ]
+}

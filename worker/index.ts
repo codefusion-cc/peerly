@@ -4,6 +4,7 @@
  * members' browsers; the server keeps it only for a premium workspace's
  * history (encrypted, in its channel).
  */
+import { createConsoleRoutes, isConsoleRoute } from '@codefusion-cc/console/worker'
 import { handleGoogleSignIn } from '@codefusion-cc/google-sign-in'
 import { handleRealtimeRoute, prepareAuthenticatedRealtimeUpgrade, type RealtimeRouteConfig } from '@codefusion-cc/realtime'
 import { APP_ID, ROUTES } from '../shared/app.ts'
@@ -11,7 +12,10 @@ import { handleSignInCallback } from './signInCallback.ts'
 import { handleIceServers } from './ice.ts'
 import { signInOptions, signInVerifier, type SignInEnv } from './signInProviders.ts'
 
+export { AccountDirectory } from '@codefusion-cc/realtime'
 export { Channel } from './channel.ts'
+// CodeFusion Console reads accounts and grants plans through this, over a service binding only.
+export { ConsoleAdmin } from './console/consoleAdmin.ts'
 export { UserGateway } from './gateway.ts'
 
 const ROUTE_ID = /^[A-Za-z0-9_-]{43}$/
@@ -53,6 +57,12 @@ function signInReturns(env: Env) {
   }
 }
 
+/** The pages the page reports views of and failures on (src/console.ts); anything else is counted as other. */
+export const CONSOLE_PAGES = ['signin', 'home', 'workspace', 'join', 'settings', 'legal', 'not-found'] as const
+
+// Error reports and anonymous view counts from Peerly's pages, for CodeFusion Console (Privacy Policy).
+const consoleRoutes = createConsoleRoutes({ appId: APP_ID, pages: [...CONSOLE_PAGES] })
+
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } })
 
 export default {
@@ -67,6 +77,10 @@ export default {
       identityProvider: providerId => signInVerifier(providerId, env),
     }
 
+    if (isConsoleRoute(url.pathname)) {
+      const answer = await consoleRoutes.fetch(request, env as never, context, apiOrigin(env, url.origin))
+      if (answer) return answer
+    }
     if (url.pathname === ROUTES.signInOptions) {
       if (request.method !== 'GET') return json({ code: 'method-not-allowed' }, 405)
       return json({ providers: await signInOptions(env) })

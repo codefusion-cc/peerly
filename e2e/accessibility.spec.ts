@@ -33,6 +33,21 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await send(ala.page, 'A message with a link: https://example.com')
     await accessible(ala.page, 'channel')
 
+    // Every colour an avatar can take, as the avatar draws its initials (a random account gets only one).
+    await ala.page.evaluate(() => {
+      const tones = ['primary', 'secondary', 'accent', 'info', 'success', 'warning', 'error', 'neutral']
+      const row = document.createElement('div')
+      row.setAttribute('data-testid', 'tones')
+      for (const tone of tones) {
+        const avatar = document.createElement('span')
+        avatar.className = `inline-grid size-8 place-items-center rounded-full text-xs font-semibold bg-${tone} text-${tone}-content`
+        avatar.textContent = 'AB'
+        row.append(avatar)
+      }
+      document.querySelector('main')?.prepend(row)
+    })
+    await accessible(ala.page, 'avatar tones')
+
     for (const section of ['account', 'devices', 'appearance', 'storage']) {
       await ala.page.goto(section === 'account' ? '/settings' : `/settings/${section}`)
       await expect(ala.page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible()

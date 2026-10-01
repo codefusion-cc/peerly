@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './theme.ts'
 import './index.css'
 import { App } from './App.tsx'
+import { installBrowserFailureReporting } from './console.ts'
 import { I18nProvider } from './I18nProvider.tsx'
+
+installBrowserFailureReporting()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

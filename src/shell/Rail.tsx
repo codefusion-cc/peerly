@@ -1,4 +1,4 @@
-import { Plus, Settings } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import type { Account } from '../auth/session.ts'
 import { useI18n } from '../i18nContext.ts'
 import { navigate, type Route } from '../router.ts'
@@ -25,7 +25,7 @@ export function Rail({ account, workspaces, activeId, route }: {
               {active && <span className="absolute -left-3 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r bg-primary" aria-hidden="true" />}
               <a href={`/w/${workspace.id}`} title={workspace.name} aria-current={active ? 'page' : undefined}
                 onClick={event => { event.preventDefault(); navigate({ name: 'workspace', workspaceId: workspace.id }) }}
-                className={`block rounded-xl transition ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-base-200' : 'opacity-85 hover:opacity-100'}`}>
+                className={`block rounded-xl transition ring-offset-2 ring-offset-base-200 ${active ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-base-content/20'}`}>
                 <Avatar name={workspace.name} seed={workspace.id} square />
                 <span className="sr-only">{workspace.name}</span>
               </a>
@@ -41,11 +41,9 @@ export function Rail({ account, workspaces, activeId, route }: {
         </li>
       </ul>
       <a href="/settings" onClick={event => { event.preventDefault(); navigate({ name: 'settings', section: 'account' }) }}
-        aria-current={route.name === 'settings' ? 'page' : undefined} className="relative rounded-full" title={t.settings} aria-label={t.settings}>
+        aria-current={route.name === 'settings' ? 'page' : undefined} title={t.settings} aria-label={t.settings}
+        className={`rounded-full ring-offset-2 ring-offset-base-200 transition hover:ring-2 hover:ring-base-content/20 ${route.name === 'settings' ? 'ring-2 ring-primary' : ''}`}>
         <Avatar name={account.name} seed={account.userId} size="md" />
-        <span className="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-base-100 shadow">
-          <Settings className="size-3.5" aria-hidden="true" />
-        </span>
       </a>
     </nav>
   )
