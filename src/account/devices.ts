@@ -6,7 +6,7 @@
  * of a workspace it owns.
  */
 import {
-  createAccountKeys, createKvStore, createLinkedDevices, describeDevice, sendRealtimeCommand, subscribeRealtimeEvent,
+  acrossTabs, createAccountKeys, createKvStore, createLinkedDevices, describeDevice, sendRealtimeCommand, subscribeRealtimeEvent,
   type AccountSecrets, type StoredDevice,
 } from '@codefusion-cc/realtime/browser'
 import { APP_ID } from '../config.ts'
@@ -20,7 +20,7 @@ export const linkedDevices = createLinkedDevices({
   command: (type, payload) => sendRealtimeCommand(APP_ID, type, payload),
   store: createKvStore<StoredDevice>(`${APP_ID}-devices`, 'devices'),
   deviceName: () => describeDevice(navigator.userAgent, navigator.maxTouchPoints > 0) ?? 'Browser',
-  lock: (name, work) => navigator.locks ? navigator.locks.request(name, work) : work(),
+  lock: acrossTabs,
 })
 
 /** Keeps this device's view of the account's devices current; returns the stop function. */
@@ -32,5 +32,14 @@ export function followDevices(userId: string): () => void {
   })
 }
 
-/** The account's secrets on this device: null until it is linked (a second device asks a linked one first). */
-export const accountSecrets = (userId: string): Promise<AccountSecrets | null> => linkedDevices.secrets(userId)
+/**
+ * The account's secrets on this device: null until it is linked (a second
+ * device asks a linked one first). A first device that has not finished
+ * making its keys finishes now.
+ */
+export async function accountSecrets(userId: string): Promise<AccountSecrets | null> {
+  const held = await linkedDevices.secrets(userId)
+  if (held) return held
+  await linkedDevices.sync(userId).catch(() => {})
+  return linkedDevices.secrets(userId)
+}

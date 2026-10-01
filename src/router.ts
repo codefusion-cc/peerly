@@ -65,3 +65,12 @@ export function useRoute(): Route {
   const pathname = useSyncExternalStore(listener => { listeners.add(listener); return () => listeners.delete(listener) }, () => location.pathname, () => '/')
   return parseRoute(pathname)
 }
+
+/** The URL's fragment (`#create`, an invite); the component renders again when it changes. */
+export function useHash(): string {
+  return useSyncExternalStore(listener => {
+    listeners.add(listener)
+    window.addEventListener('hashchange', listener)
+    return () => { listeners.delete(listener); window.removeEventListener('hashchange', listener) }
+  }, () => location.hash, () => '')
+}

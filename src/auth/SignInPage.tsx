@@ -3,7 +3,7 @@ import { startGoogleSignIn, takeGoogleSignInResult } from '@codefusion-cc/google
 import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 import { ROUTES } from '../../shared/app.ts'
 import { authOrigin, E2E_AUTH } from '../config.ts'
-import { useI18n } from '../i18nContext.tsx'
+import { useI18n } from '../i18nContext.ts'
 import { navigate } from '../router.ts'
 import { ProviderIcon } from './ProviderIcon.tsx'
 import { startRedirectSignIn, takeRedirectSignInResult, type RedirectSignInOption } from './redirectSignIn.ts'
@@ -14,7 +14,7 @@ type ProviderOption = { id: 'google'; clientId: string } | (RedirectSignInOption
 const PROVIDER_NAMES: Record<Exclude<ProviderId, 'oidc'>, string> = { google: 'Google', microsoft: 'Microsoft', apple: 'Apple' }
 
 /** Where to go once signed in: the `next` the sign-in started with, if it is a path on this origin. */
-export function nextPath(search: string): string {
+function nextPath(search: string): string {
   const next = new URLSearchParams(search).get('next') ?? '/'
   return next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/signin') ? next : '/'
 }

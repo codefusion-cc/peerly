@@ -16,7 +16,7 @@ type IceEnv = TurnEnv & {
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store', ...headers } })
 
-/** `GET /api/media/ice`: `{ iceServers, ttlMs, relay }` for the signed-in account. */
+/** `GET /api/realtime/media/ice`: `{ iceServers, ttlMs, relay }` for the signed-in account. */
 export async function handleIceServers(request: Request, env: IceEnv): Promise<Response> {
   if (request.method !== 'GET') return json({ code: 'method-not-allowed' }, 405, { allow: 'GET' })
   const auth = await authenticateSessionCookie(request, env as never, { app: APP_ID, requirePublicUserId: true })

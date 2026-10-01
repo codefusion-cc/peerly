@@ -7,7 +7,7 @@
  *   author deletes it, and the reactions each person last left on it.
  * Only a message's author may edit or delete it; anyone else's attempt is ignored.
  */
-import type { ChannelOp, FileRef, MessageOp, Op } from './ops.ts'
+import type { ChannelOp, DeleteOp, EditOp, FileRef, MessageOp, Op, ReactOp } from './ops.ts'
 
 export type Channel = { id: string; name: string; pos: number }
 export type Reaction = { emoji: string; by: string[] }
@@ -51,14 +51,14 @@ export function deriveWorkspaceName(ops: Iterable<Op>, ownerUserId: string): str
 /** A channel's messages, oldest first, with edits, deletions and reactions applied. */
 export function deriveMessages(channelId: string, ops: Iterable<Op>): Message[] {
   const messages = new Map<string, MessageOp>()
-  const changes: Op[] = []
+  const changes: Array<EditOp | DeleteOp | ReactOp> = []
   for (const op of ops) {
     if (op.kind === 'msg' && op.c === channelId) messages.set(op.id, op)
     else if (op.kind === 'edit' || op.kind === 'del' || op.kind === 'react') changes.push(op)
   }
-  const edits = new Map<string, Extract<Op, { kind: 'edit' }>>()
+  const edits = new Map<string, EditOp>()
   const deleted = new Set<string>()
-  const reactions = new Map<string, Map<string, Extract<Op, { kind: 'react' }>>>()
+  const reactions = new Map<string, Map<string, ReactOp>>()
   for (const op of changes) {
     if (op.kind === 'react') {
       if (!messages.has(op.target)) continue
@@ -81,16 +81,20 @@ export function deriveMessages(channelId: string, ops: Iterable<Op>): Message[] 
   return [...messages.values()].sort((a, b) => a.at - b.at || a.id.localeCompare(b.id)).map(op => {
     const edit = edits.get(op.id)
     const gone = deleted.has(op.id)
-    const grouped = new Map<string, string[]>()
+    // Each emoji in the order it was first left (then by emoji), so every device lists them alike.
+    const grouped = new Map<string, { first: number; by: string[] }>()
     for (const reaction of reactions.get(op.id)?.values() ?? []) {
       if (!reaction.on) continue
-      grouped.set(reaction.emoji, [...grouped.get(reaction.emoji) ?? [], reaction.by])
+      const group = grouped.get(reaction.emoji)
+      if (group) { group.by.push(reaction.by); group.first = Math.min(group.first, reaction.at) }
+      else grouped.set(reaction.emoji, { first: reaction.at, by: [reaction.by] })
     }
     return {
       id: op.id, channelId: op.c, by: op.by, dk: op.dk, at: op.at,
       text: gone ? '' : edit?.text ?? op.text, files: gone ? [] : op.files ?? [],
       ...(op.reply ? { reply: op.reply } : {}), ...(edit && !gone ? { editedAt: edit.at } : {}), deleted: gone,
-      reactions: gone ? [] : [...grouped].map(([emoji, by]) => ({ emoji, by: by.sort() })),
+      reactions: gone ? [] : [...grouped].sort((a, b) => a[1].first - b[1].first || a[0].localeCompare(b[0]))
+        .map(([emoji, group]) => ({ emoji, by: group.by.sort() })),
     }
   })
 }

@@ -23,6 +23,8 @@ export type Workspace = {
   list: MemberList
   joinedAt: number
   lastOpenedAt: number
+  /** Made on this device and not yet given its first channel and name (the session does that once). */
+  setup?: boolean
 }
 
 /** What an invite link carries. */
@@ -125,10 +127,14 @@ export async function createWorkspace(account: Account, name: string, emails: st
     scope: await capabilityOf({ secret }), ownerUserId: account.userId, emails: [account.email, ...emails],
   }).catch(() => { throw new WorkspaceError('invalid') })
   await authorizeWorkspace({ secret, list })
-  const workspace: Workspace = { id: randomId(12), secret, name: cleanName, list, joinedAt: Date.now(), lastOpenedAt: Date.now() }
+  const workspace: Workspace = { id: randomId(12), secret, name: cleanName, list, joinedAt: Date.now(), lastOpenedAt: Date.now(), setup: true }
   await update(account.userId, workspaces => [workspace, ...workspaces])
   return workspace
 }
+
+/** The workspace got its first channel and name: never again from this device. */
+export const setupDone = (userId: string, workspaceId: string) =>
+  update(userId, items => items.map(item => item.id === workspaceId ? { ...item, setup: false } : item))
 
 /** A newer list from the owner (changing who is in); only an owner's linked device can sign one. */
 export async function setMembers(account: Account, workspace: Workspace, emails: string[]): Promise<Workspace> {

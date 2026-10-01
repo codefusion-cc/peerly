@@ -22,7 +22,7 @@ describe('ops', () => {
       expect(parseOp(JSON.parse(JSON.stringify(op)))).toEqual(op)
       expect(await signedByItsDevice(op)).toBe(true)
     }
-    const [message] = ops as [Extract<Op, { kind: 'msg' }>]
+    const message = ops[0] as Extract<Op, { kind: 'msg' }>
     for (const forged of [
       { ...message, text: 'something else' }, { ...message, c: 'channel-other-0001' }, { ...message, at: message.at + 1 },
       { ...message, by: 'someone-else-12' }, { ...message, files: [] }, { ...message, reply: undefined },
@@ -47,7 +47,7 @@ describe('ops', () => {
       { ...op, files: [{ hash: 'nope', name: 'a', size: 1, type: 'x' }] }, { ...op, files: Array.from({ length: 11 }, () => ({ hash: HASH, name: 'a', size: 1, type: 'x' })) },
       { ...op, files: [{ hash: HASH, name: 'a', size: 1, type: 'x', preview: 'data:image/png;base64,AAAA' }] },
       { ...op, files: [{ hash: HASH, name: 'a', size: 200 * 1024 * 1024, type: 'x' }] },
-      { kind: 'chan', ...op, c: CHANNEL, name: ' padded ', pos: 0, deleted: false }, { ...op, kind: 'react', target: 'message-id-000000', emoji: '', on: true },
+      { ...op, kind: 'chan', c: CHANNEL, name: ' padded ', pos: 0, deleted: false }, { ...op, kind: 'react', target: 'message-id-000000', emoji: '', on: true },
     ]) expect(parseOp(value)).toBeNull()
     // A message with only files and no text is fine.
     const withFile = await signOp(device(), USER, { kind: 'msg', c: CHANNEL, text: '', files: [{ hash: HASH, name: 'a.bin', size: 1, type: '' }] })

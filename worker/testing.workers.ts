@@ -7,7 +7,7 @@ import { vi } from 'vitest'
 import { createAccountKeys } from '@codefusion-cc/realtime/browser'
 import { openControlSocket, PROOF_PURPOSES, testDevice, type TestDevice } from '@codefusion-cc/realtime/testing'
 import { verifyCapability } from '@codefusion-cc/realtime'
-import { APP_ID } from '../shared/app.ts'
+import { APP_ID, ROUTES } from '../shared/app.ts'
 import { signMemberList } from '../shared/memberList.ts'
 import { mintE2eToken } from '../src/auth/e2eKeys.ts'
 import jwks from '../e2e/fixtures/oidcJwks.json'
@@ -30,7 +30,8 @@ export function serveIssuerKeys() {
 export type Person = {
   email: string
   device: TestDevice
-  cookie: string
+  /** The session cookie as a browser holds it: sent only to paths under its `Path`. */
+  cookieFor(path: string): string | undefined
   uid: string
   sid: string
   userId: string
@@ -52,8 +53,10 @@ export async function signIn(email = `${crypto.randomUUID().slice(0, 8)}@example
   })
   if (session.status !== 200) throw new Error(`session: ${session.status}`)
   const claims = await verifyCapability(env.NETWORK_SESSION_SECRET, capability, { app: APP_ID, now: Date.now() })
+  const [cookie, ...attributes] = session.headers.get('set-cookie')!.split(';').map(part => part.trim())
+  const cookiePath = attributes.find(attribute => attribute.toLowerCase().startsWith('path='))?.slice(5) ?? '/'
   return {
-    email, device, cookie: session.headers.get('set-cookie')!.split(';')[0],
+    email, device, cookieFor: path => path === cookiePath || path.startsWith(cookiePath.endsWith('/') ? cookiePath : `${cookiePath}/`) ? cookie : undefined,
     uid: claims!.uid, sid: claims!.sid, userId: claims!.user as string,
   }
 }
@@ -104,6 +107,9 @@ export async function authorize(person: Person, scope: string, list: unknown) {
   return answer
 }
 
-/** A WebSocket upgrade to a workspace's channel with the person's cookie. */
-export const join = (person: Person, routeId: string) =>
-  SELF.fetch(`${ORIGIN}/api/workspaces/${routeId}`, { headers: { upgrade: 'websocket', origin: ORIGIN, cookie: person.cookie } })
+/** A WebSocket upgrade to a workspace's channel, with the cookie a browser would send there. */
+export function join(person: Person, routeId: string) {
+  const path = `${ROUTES.workspaces}${routeId}`
+  const cookie = person.cookieFor(path)
+  return SELF.fetch(`${ORIGIN}${path}`, { headers: { upgrade: 'websocket', origin: ORIGIN, ...(cookie ? { cookie } : {}) } })
+}

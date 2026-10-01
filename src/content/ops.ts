@@ -37,7 +37,11 @@ export type ChannelOp = Base & { kind: 'chan'; c: string; name: string; pos: num
 export type WorkspaceOp = Base & { kind: 'ws'; name: string }
 export type Op = MessageOp | EditOp | DeleteOp | ReactOp | ChannelOp | WorkspaceOp
 export type OpKind = Op['kind']
-export type UnsignedOp = Op extends infer T ? T extends Op ? Omit<T, 'id' | 'by' | 'dk' | 'at' | 'sig'> : never : never
+/** `Omit` for each kind of op, so each keeps its own fields. */
+type EachOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+export type UnsignedOp = EachOmit<Op, 'id' | 'by' | 'dk' | 'at' | 'sig'>
+/** An op before its device signs it. */
+export type OpToSign = EachOmit<Op, 'sig'>
 
 const ID = /^[A-Za-z0-9_-]{16,32}$/
 const USER = /^[A-Za-z0-9_-]{8,128}$/
@@ -101,7 +105,7 @@ export function parseOp(value: unknown, now = Date.now()): Op | null {
 }
 
 /** The exact bytes a device signs: the scheme, then every field but the signature, in one order per kind. */
-export function opBytes(op: Omit<Op, 'sig'>): Uint8Array {
+export function opBytes(op: OpToSign): Uint8Array {
   const { id, by, dk, at } = op
   const fields: unknown[] = [OP_SCHEME, op.kind, id, by, dk, at]
   switch (op.kind) {
@@ -120,7 +124,7 @@ export const newId = () => btoa(String.fromCharCode(...crypto.getRandomValues(ne
 
 /** A new op by this account, signed by this device. */
 export async function signOp<T extends UnsignedOp>(signer: DeviceSigner, userId: string, body: T, now = Date.now()): Promise<Op> {
-  const unsigned = { ...body, id: newId(), by: userId, dk: await signer.publicKeyId(), at: now } as Omit<Op, 'sig'>
+  const unsigned = { ...body, id: newId(), by: userId, dk: await signer.publicKeyId(), at: now } as OpToSign
   const signed = { ...unsigned, sig: await signer.sign(opBytes(unsigned)) } as Op
   if (!parseOp(signed, now)) throw new Error('invalid-op')
   return signed

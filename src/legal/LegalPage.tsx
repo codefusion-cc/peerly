@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react'
-import { useI18n } from '../i18nContext.tsx'
+import { useI18n } from '../i18nContext.ts'
 import { legalDocs, type LegalDocId } from './legalContent.ts'
 
 /** Static, public legal page (Privacy Policy / Terms) in the current locale. */

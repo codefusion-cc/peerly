@@ -1,9 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { detectLocale, storeLocale, STRINGS, type Locale, type Strings } from './i18n.ts'
-
-type I18n = { locale: Locale; t: Strings; setLocale(locale: Locale): void }
-
-const I18nContext = createContext<I18n | null>(null)
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { detectLocale, storeLocale, STRINGS, type Locale } from './i18n.ts'
+import { I18nContext, type I18n } from './i18nContext.ts'
 
 /** The page's language: the strings every component reads, and switching them. */
 export function I18nProvider({ children, initial }: { children: ReactNode; initial?: Locale }) {
@@ -14,10 +11,4 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
     setLocale: next => { storeLocale(next); setLocale(next) },
   }), [locale])
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
-}
-
-export function useI18n(): I18n {
-  const value = useContext(I18nContext)
-  if (!value) throw new Error('useI18n must be used inside <I18nProvider>')
-  return value
 }

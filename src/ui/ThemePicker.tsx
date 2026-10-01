@@ -1,6 +1,6 @@
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { useTheme } from '@codefusion-cc/theme/react'
-import { useI18n } from '../i18nContext.tsx'
+import { useI18n } from '../i18nContext.ts'
 import { theme } from '../theme.ts'
 
 /** Light, dark or the system's, as one segmented control. */
