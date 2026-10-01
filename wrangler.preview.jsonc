@@ -30,7 +30,9 @@
   ],
   // Anonymous page view counts for the console's Visits page: no visitor id, IP or user agent.
   "analytics_engine_datasets": [
-    { "binding": "VISITS", "dataset": "cfc_visits" }
+    { "binding": "VISITS", "dataset": "cfc_visits" },
+    // Each call connection's duration, volume and quality, for the console's Calls page (channelCalls).
+    { "binding": "MEDIA_USAGE", "dataset": "cfc_media" }
   ],
   "assets": {
     "binding": "ASSETS",

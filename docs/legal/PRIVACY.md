@@ -33,6 +33,8 @@ Content: messages, edits, deletions, reactions, channel names and the workspace�
 
 Files: a file you attach is kept on your device and goes directly to the members who open it; its name, type, size and, for an image, a small preview travel inside the encrypted message. Members’ devices keep the files they open and pass them to other members who ask. If the workspace’s owner has Premium, your device also seals each file with the workspace’s key and stores it in Cloudflare R2 under a name derived from the key, so members can get it while nobody who has it is online. We cannot open these files or tell which file one is; we see their size and when they were stored. Each workspace may keep up to 5 GB, and the files are deleted when the owner’s Premium ends.
 
+Calls: when you join a workspace’s call, your microphone and, if you turn it on, your camera go directly to the others in the call (peer to peer, encrypted between the devices). If a member in the call has Premium, the call may go through Cloudflare: through its TURN relay, which passes the encrypted media on, or, with more than four people, through Cloudflare Realtime’s SFU, which forwards it; the connection to the SFU is encrypted, but the SFU has access to the media it forwards. Peerly does not record calls. The workspace’s channel knows who is in the call and passes the connection set-up; for CodeFusion Console we record each call connection’s duration, data volume and quality figures, without its content or IP address.
+
 Your name in a workspace: the name you signed in with is sent, encrypted, to the members you meet. Their devices remember the names they have seen in that workspace, and may pass them to other members who have not seen you.
 
 IP address: to connect directly, members’ devices exchange their network addresses (ICE candidates) through the workspace’s channel, including the public address Cloudflare’s STUN server finds. The other members of your workspaces can therefore learn your IP address, and from it your approximate location and internet provider. A Premium account’s connections may go through Cloudflare’s TURN relay instead; Cloudflare then sees your IP address and the connection’s metadata, and the other members see the relay’s address. We pass these addresses only to members of the same workspace and do not keep them.
@@ -66,7 +68,8 @@ On your device: your workspaces (their secrets and member lists), the messages, 
 
 - Cloudflare Workers and Durable Objects: sign-in, sessions, devices, workspace channels, encrypted history, plans.
 - Cloudflare R2: a Premium workspace’s sealed files.
-- Cloudflare STUN and TURN: finding a device’s public address for direct connections, and relaying a Premium account’s connections.
+- Cloudflare STUN and TURN: finding a device’s public address for direct connections, and relaying a Premium account’s connections and calls.
+- Cloudflare Realtime SFU: forwarding the media of calls with a Premium member and more than four people.
 - Cloudflare Static Assets: serving the app’s files.
 - Cloudflare Workers Analytics Engine and D1, through CodeFusion Console: diagnostics, error reports and page view counts.
 - Identity providers (Google, Microsoft, Apple, or your organization’s): signing in.
@@ -80,7 +83,7 @@ Cloudflare may process data outside the European Economic Area under the EU Stan
 - A workspace’s member IDs: while the workspace is used; a newer list replaces them.
 - A Premium workspace’s history: the latest 5,000 changes, and its sealed files, while the owner’s Premium lasts; both are deleted when Premium ends.
 - Your account ID, devices and plan: until you ask us to delete your account.
-- Error reports: 30 days; request, diagnostics and page view statistics: 3 months; Cloudflare’s request logs: 7 days.
+- Error reports: 30 days; request, diagnostics, call and page view statistics: 3 months; Cloudflare’s request logs: 7 days.
 
 ## 8. Your rights
 

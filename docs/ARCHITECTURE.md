@@ -57,6 +57,16 @@ built on `@codefusion-cc/realtime`. This is the map; each module's comment has t
   asks the members online over the mesh (which checks the bytes against the hash), then, for a Premium
   workspace, the cloud. Files are only ever shown as images or saved, never opened in the app's origin.
 
+## Calls
+
+- **The channel hosts the workspace's call** (`channelCalls` of `@codefusion-cc/realtime-media`, through
+  `defineAuthorizedChannel`'s `extend`): who is in it, how it travels (peer to peer, or the SFU), peer-to-peer
+  signals and the SFU's sessions. Members' pages send `media` commands and get the call's state in their snapshot
+  and in `call` frames.
+- **The page** ([src/calls](../src/calls), [src/shell/CallStage.tsx](../src/shell/CallStage.tsx)) runs a
+  `CallController` per workspace session: the camera and microphone, and the session the channel's transport asks
+  for. One joins explicitly; the stage shows each person's camera or avatar, who is speaking, and the controls.
+
 ## Premium
 
 What it adds and how staff grant it: [PREMIUM.md](PREMIUM.md).

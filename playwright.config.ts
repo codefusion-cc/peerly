@@ -25,11 +25,12 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        permissions: ['clipboard-read', 'clipboard-write'],
+        permissions: ['clipboard-read', 'clipboard-write', 'camera', 'microphone'],
         launchOptions: {
           chromiumSandbox: false,
-          // Two browser contexts on one machine reach each other over loopback, as they would on a LAN.
-          args: ['--disable-features=WebRtcHideLocalIpsWithMdns'],
+          // Two browser contexts on one machine reach each other over loopback, as they would on a LAN;
+          // calls use Chromium's fake camera and microphone.
+          args: ['--disable-features=WebRtcHideLocalIpsWithMdns', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
         },
       },
     },

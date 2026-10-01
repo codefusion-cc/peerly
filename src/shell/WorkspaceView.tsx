@@ -1,4 +1,4 @@
-import { ChevronDown, Cloud, Hash, LogOut, MoreHorizontal, Pencil, Plus, Radio, ShieldAlert, Trash2, UserPlus, Users } from 'lucide-react'
+import { ChevronDown, Cloud, Hash, Headphones, Loader2, LogOut, MoreHorizontal, Pencil, Plus, Radio, ShieldAlert, Trash2, UserPlus, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { isPremium, useMembership } from '../account/useMembership.ts'
 import type { Account } from '../auth/session.ts'
@@ -12,6 +12,8 @@ import { Spinner } from '../ui/Spinner.tsx'
 import { forgetNames, type SessionView, type WorkspaceSession } from '../workspaces/session.ts'
 import { useSessionView, useWorkspaceSession } from '../workspaces/useWorkspace.ts'
 import { isOwner, leaveWorkspace, touchWorkspace, type Workspace } from '../workspaces/workspaces.ts'
+import { callMembers, joinCall, useCall } from '../calls/useCall.ts'
+import { CallStage } from './CallStage.tsx'
 import { ChannelView } from './ChannelView.tsx'
 import { MembersDialog } from './MembersDialog.tsx'
 import { NameDialog } from './NameDialog.tsx'
@@ -54,6 +56,7 @@ export function WorkspaceView({ account, workspaces, workspaceId, channelId }: {
       <Sidebar account={account} workspace={workspace} session={session} view={view} channelId={channelId}
         className={channelId ? 'hidden md:flex' : 'flex'} />
       <div className={`min-w-0 flex-1 flex-col ${channelId ? 'flex' : 'hidden md:flex'}`}>
+        <CallStage account={account} session={session} view={view} />
         {channel ? (
           <ChannelView key={channel.id} account={account} workspace={workspace} session={session} view={view} channel={channel} />
         ) : channelId && view.channels.length ? (
@@ -105,6 +108,7 @@ function Sidebar({ account, workspace, session, view, channelId, className }: {
             <li role="none"><button type="button" role="menuitem" className="text-error" onClick={() => setDialog('leave')}><LogOut className="size-4" aria-hidden="true" />{t.leaveWorkspace}</button></li>
           </ul>
         </div>
+        <CallButton account={account} session={session} />
       </header>
 
       <div className="space-y-1.5 border-b border-base-300 px-4 py-2.5 text-xs text-base-content/70">
@@ -199,6 +203,28 @@ function Sidebar({ account, workspace, session, view, channelId, className }: {
       <ConfirmDialog open={dialog === 'leave'} onClose={() => setDialog(null)} title={t.leaveWorkspace}
         body={t.leaveConfirm(view.name)} action={t.leaveWorkspace} onConfirm={leave} />
     </aside>
+  )
+}
+
+/** Joins the workspace's call from its header: how many are in it, and whether this page is. */
+function CallButton({ account, session }: { account: Account; session: WorkspaceSession }) {
+  const { t } = useI18n()
+  const state = useCall(session)
+  const count = callMembers(state, account.userId).length
+  const [joining, setJoining] = useState(false)
+  return (
+    <button type="button" className={`btn btn-sm btn-square indicator ${state.joined ? 'btn-success' : 'btn-ghost'}`}
+      disabled={joining} aria-pressed={state.joined} title={state.joined ? t.leaveTheCall : count ? t.joinCall : t.startCall}
+      aria-label={state.joined ? t.leaveTheCall : count ? `${t.joinCall} (${count})` : t.startCall}
+      onClick={async () => {
+        if (state.joined) { session.call.leave(); return }
+        setJoining(true)
+        await joinCall(session)
+        setJoining(false)
+      }}>
+      {count > 0 && !state.joined && <span className="indicator-item badge badge-success badge-xs">{count}</span>}
+      {joining ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Headphones className="size-4" aria-hidden="true" />}
+    </button>
   )
 }
 

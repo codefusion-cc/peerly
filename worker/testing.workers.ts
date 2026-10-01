@@ -113,3 +113,22 @@ export function join(person: Person, routeId: string) {
   const cookie = person.cookieFor(path)
   return SELF.fetch(`${ORIGIN}${path}`, { headers: { upgrade: 'websocket', origin: ORIGIN, ...(cookie ? { cookie } : {}) } })
 }
+
+/** A member's open socket to a workspace's channel: every frame it heard, and waiting for one. */
+export async function connect(person: Person, routeId: string) {
+  const response = await join(person, routeId)
+  const socket = (response as Response & { webSocket: WebSocket & { accept(): void } | null }).webSocket
+  if (response.status !== 101 || !socket) throw new Error(`refused: ${response.status}`)
+  socket.accept()
+  const frames: Array<Record<string, any>> = []
+  const waiting = new Set<() => void>()
+  socket.addEventListener('message', event => { frames.push(JSON.parse(String(event.data))); for (const wake of waiting) wake() })
+  const next = (match: (frame: Record<string, any>) => boolean, from = 0) => new Promise<Record<string, any>>((resolve, reject) => {
+    let seen = from
+    const check = () => { for (; seen < frames.length; seen++) if (match(frames[seen])) { waiting.delete(check); clearTimeout(timer); resolve(frames[seen]); return } }
+    const timer = setTimeout(() => { waiting.delete(check); reject(new Error(`no matching frame among ${JSON.stringify(frames.map(f => f.type))}`)) }, 3_000)
+    waiting.add(check)
+    check()
+  })
+  return { socket, frames, next }
+}

@@ -14,6 +14,9 @@ export default defineConfig({
           E2E_ALLOWED_ORIGIN: 'https://peerly.test',
           OIDC_ISSUER: 'https://issuer.peerly.test',
           OIDC_JWKS_URL: 'https://issuer.peerly.test/jwks',
+          // TURN counts as configured, so a call may offer relays; nothing here asks Cloudflare for credentials.
+          TURN_KEY_ID: 'test-turn-key',
+          TURN_KEY_API_TOKEN: 'test-turn-token',
         },
       },
     }),

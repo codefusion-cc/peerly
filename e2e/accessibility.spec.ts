@@ -45,6 +45,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await accessible(ala.page, 'composer with files')
     await send(ala.page, 'With files')
     await accessible(ala.page, 'channel')
+    await ala.page.getByRole('button', { name: 'Start a call' }).click()
+    await expect(ala.page.getByRole('toolbar', { name: 'Call controls' })).toBeVisible()
+    await ala.page.getByRole('button', { name: 'Microphone, camera and speaker' }).click()
+    await expect(ala.page.getByRole('combobox', { name: /^Microphone/ })).toBeVisible()
+    await accessible(ala.page, 'call')
+    await ala.page.getByRole('button', { name: 'Leave', exact: true }).click()
 
     // Every colour an avatar can take, as the avatar draws its initials (a random account gets only one).
     await ala.page.evaluate(() => {

@@ -15,9 +15,12 @@
  *   connection the channel named.
  */
 import { openDurableChannel, type ChannelAction, type DurableChannelRoom } from '@codefusion-cc/realtime/browser'
+import { CallController } from '@codefusion-cc/realtime-media/browser'
+import { cameraConstraints, cameraEncoding, cameraEncodings, DEFAULT_CAMERA_QUALITY } from '@codefusion-cc/realtime-media/policy'
 import { createDataMesh, type DataMesh, type MeshPeer } from '@codefusion-cc/realtime-p2p'
 import { ROUTES } from '../../shared/app.ts'
 import { device, type Account } from '../auth/session.ts'
+import { devices } from '../calls/devices.ts'
 import { APP_ID } from '../config.ts'
 import { deriveChannels, deriveMessages, deriveWorkspaceName, type Channel, type Message } from '../content/derive.ts'
 import { newId, parseOp, signedByItsDevice, signOp, type FileRef, type Op, type UnsignedOp } from '../content/ops.ts'
@@ -128,6 +131,9 @@ export class WorkspaceSession {
   private routeId: string | null = null
   /** The workspace's files on this device (and in the cloud, for a Premium owner's workspace). */
   readonly files: WorkspaceFiles
+  /** The workspace's call, which this page is in only after `call.join()`. */
+  readonly call: CallController
+  private readonly callListeners = new Set<() => void>()
 
   constructor(account: Account, workspace: Workspace, defaultChannelName = 'general') {
     this.account = account
@@ -136,6 +142,14 @@ export class WorkspaceSession {
     this.files = new WorkspaceFiles({
       userId: account.userId, workspaceId: workspace.id, secret: workspace.secret,
       routeId: () => this.routeId, history: () => this.state.history, mesh: () => this.mesh,
+    })
+    const camera = DEFAULT_CAMERA_QUALITY.standard
+    this.call = new CallController({
+      userId: account.userId,
+      request: (payload, options) => this.room ? this.room.requestServer('media', payload, options) : Promise.reject(new Error('durable-channel-not-open')),
+      onChange: () => { for (const listener of this.callListeners) listener() },
+      initialDevices: { audioId: devices.loadPreferredAudioInput(), videoId: devices.loadPreferredVideoInput() },
+      video: { constraints: () => cameraConstraints(camera), encoding: () => cameraEncoding(camera), encodings: () => cameraEncodings(camera) },
     })
     this.state = {
       status: 'connecting', refused: null, history: false, online: [], peers: [], channels: [], name: workspace.name,
@@ -164,6 +178,7 @@ export class WorkspaceSession {
 
   view = () => this.state
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
+  subscribeCall = (listener: () => void) => { this.callListeners.add(listener); return () => { this.callListeners.delete(listener) } }
   private set(change: Partial<SessionView>) {
     if (this.stopped) return
     this.state = { ...this.state, ...change }
@@ -196,7 +211,12 @@ export class WorkspaceSession {
           this.set({ history: answer.history })
           return { routeId: answer.routeId }
         },
-        onConnectionState: state => this.set({ status: state === 'closed' ? 'closed' : state === 'online' ? 'online' : state === 'reconnecting' ? 'reconnecting' : 'connecting' }),
+        onConnectionState: state => {
+          this.call.connection(state)
+          this.set({ status: state === 'closed' ? 'closed' : state === 'online' ? 'online' : state === 'reconnecting' ? 'reconnecting' : 'connecting' })
+        },
+        // The call's frames (its state, peers' signals) go to the call.
+        onServerFrame: frame => this.call.frame(frame),
         onHistory: enabled => this.set({ history: enabled }),
       })
     } catch {
@@ -236,6 +256,8 @@ export class WorkspaceSession {
     this.mesh?.close()
     this.room?.leave()
     this.files.close()
+    this.call.dispose()
+    this.callListeners.clear()
     this.listeners.clear()
   }
 

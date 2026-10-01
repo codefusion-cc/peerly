@@ -10,7 +10,9 @@ server's resources:
 | Files between members online | ✓ | ✓ |
 | History kept for the workspaces the account **owns** (latest 5,000 changes, encrypted) | | ✓ |
 | Files kept in the cloud for those workspaces (sealed on the device, up to 5 GB each, R2) | | ✓ |
-| Connections relayed through Cloudflare TURN when a direct one fails | | ✓ |
+| Calls between members, peer to peer | ✓ | ✓ |
+| Connections and calls relayed through Cloudflare TURN when a direct one fails | | ✓ |
+| Calls of more than four people through Cloudflare Realtime's SFU | | ✓ |
 
 - **History follows the owner's plan.** Only the owner's session sets a workspace channel's history, from the
   owner's plan and its end date; a member's plan does not change it. When the plan ends (its date passes or staff
@@ -21,6 +23,10 @@ server's resources:
   store or read one; the server never learns which file it is.
 - **Relays follow the account's own plan** ([worker/ice.ts](../worker/ice.ts)): STUN for everyone, TURN
   credentials for a Premium account, renewed before they expire and rate limited.
+- **A call follows its members' plans** ([worker/channel.ts](../worker/channel.ts), `channelCalls` of
+  `@codefusion-cc/realtime-media`): free members call peer to peer without relays; when a Premium member is in it,
+  the call may use TURN and, past four people, the SFU. Each account's SFU use is bounded by its gateway
+  (`mediaGateway`).
 
 ## Granting it
 

@@ -51,6 +51,7 @@ const privacyEn: LegalDoc = {
         { p: 'While you are online: the workspace’s channel (a Cloudflare Durable Object) knows which account IDs and devices are connected, and passes on encrypted messages, names, typing notices and the set-up of direct connections between members’ devices. It cannot read them.' },
         { p: 'Content: messages, edits, deletions, reactions, channel names and the workspace’s name are signed by the device that wrote them and encrypted. They go directly to the members’ devices. If the workspace’s owner has Premium, its channel also keeps encrypted copies of the latest 5,000 changes, so members get them when they come back; this history ends when the owner’s Premium does.' },
         { p: 'Files: a file you attach is kept on your device and goes directly to the members who open it; its name, type, size and, for an image, a small preview travel inside the encrypted message. Members’ devices keep the files they open and pass them to other members who ask. If the workspace’s owner has Premium, your device also seals each file with the workspace’s key and stores it in Cloudflare R2 under a name derived from the key, so members can get it while nobody who has it is online. We cannot open these files or tell which file one is; we see their size and when they were stored. Each workspace may keep up to 5 GB, and the files are deleted when the owner’s Premium ends.' },
+        { p: 'Calls: when you join a workspace’s call, your microphone and, if you turn it on, your camera go directly to the others in the call (peer to peer, encrypted between the devices). If a member in the call has Premium, the call may go through Cloudflare: through its TURN relay, which passes the encrypted media on, or, with more than four people, through Cloudflare Realtime’s SFU, which forwards it; the connection to the SFU is encrypted, but the SFU has access to the media it forwards. Peerly does not record calls. The workspace’s channel knows who is in the call and passes the connection set-up; for CodeFusion Console we record each call connection’s duration, data volume and quality figures, without its content or IP address.' },
         { p: 'Your name in a workspace: the name you signed in with is sent, encrypted, to the members you meet. Their devices remember the names they have seen in that workspace, and may pass them to other members who have not seen you.' },
         { p: 'IP address: to connect directly, members’ devices exchange their network addresses (ICE candidates) through the workspace’s channel, including the public address Cloudflare’s STUN server finds. The other members of your workspaces can therefore learn your IP address, and from it your approximate location and internet provider. A Premium account’s connections may go through Cloudflare’s TURN relay instead; Cloudflare then sees your IP address and the connection’s metadata, and the other members see the relay’s address. We pass these addresses only to members of the same workspace and do not keep them.' },
         { p: 'Your plan: we keep your account ID, when it first and last signed in (updated at most hourly), its plan, when the plan ends, who on our team granted it and when, and an optional note. Our team finds an account by the account ID shown in Settings, which you give them when you ask about your plan.' },
@@ -88,7 +89,8 @@ const privacyEn: LegalDoc = {
         { ul: [
           'Cloudflare Workers and Durable Objects: sign-in, sessions, devices, workspace channels, encrypted history, plans.',
           'Cloudflare R2: a Premium workspace’s sealed files.',
-          'Cloudflare STUN and TURN: finding a device’s public address for direct connections, and relaying a Premium account’s connections.',
+          'Cloudflare STUN and TURN: finding a device’s public address for direct connections, and relaying a Premium account’s connections and calls.',
+          'Cloudflare Realtime SFU: forwarding the media of calls with a Premium member and more than four people.',
           'Cloudflare Static Assets: serving the app’s files.',
           'Cloudflare Workers Analytics Engine and D1, through CodeFusion Console: diagnostics, error reports and page view counts.',
           'Identity providers (Google, Microsoft, Apple, or your organization’s): signing in.',
@@ -105,7 +107,7 @@ const privacyEn: LegalDoc = {
           'A workspace’s member IDs: while the workspace is used; a newer list replaces them.',
           'A Premium workspace’s history: the latest 5,000 changes, and its sealed files, while the owner’s Premium lasts; both are deleted when Premium ends.',
           'Your account ID, devices and plan: until you ask us to delete your account.',
-          'Error reports: 30 days; request, diagnostics and page view statistics: 3 months; Cloudflare’s request logs: 7 days.',
+          'Error reports: 30 days; request, diagnostics, call and page view statistics: 3 months; Cloudflare’s request logs: 7 days.',
         ] },
       ],
     },
@@ -172,6 +174,7 @@ const privacyPl: LegalDoc = {
         { p: 'Gdy jesteś online: kanał przestrzeni (Cloudflare Durable Object) wie, które identyfikatory kont i urządzeń są połączone, i przekazuje zaszyfrowane wiadomości, imiona, informacje o pisaniu oraz zestawianie bezpośrednich połączeń między urządzeniami członków. Nie może ich odczytać.' },
         { p: 'Treść: wiadomości, ich edycje i usunięcia, reakcje, nazwy kanałów i nazwa przestrzeni są podpisywane przez urządzenie, które je utworzyło, i szyfrowane. Trafiają bezpośrednio do urządzeń członków. Jeśli właściciel przestrzeni ma Premium, jej kanał przechowuje także zaszyfrowane kopie ostatnich 5000 zmian, aby członkowie otrzymali je po powrocie; ta historia kończy się wraz z Premium właściciela.' },
         { p: 'Pliki: dołączony plik jest przechowywany na Twoim urządzeniu i trafia bezpośrednio do członków, którzy go otwierają; jego nazwa, typ, rozmiar, a w przypadku obrazu także mały podgląd, podróżują wewnątrz zaszyfrowanej wiadomości. Urządzenia członków zachowują otwarte pliki i przekazują je innym członkom, którzy o nie poproszą. Jeśli właściciel przestrzeni ma Premium, Twoje urządzenie dodatkowo pieczętuje każdy plik kluczem przestrzeni i zapisuje go w Cloudflare R2 pod nazwą wyprowadzoną z klucza, aby członkowie mogli go pobrać, gdy nikt, kto go ma, nie jest online. Nie możemy otworzyć tych plików ani ustalić, który to plik; widzimy ich rozmiar i czas zapisania. Każda przestrzeń może przechowywać do 5 GB, a pliki są usuwane, gdy kończy się Premium właściciela.' },
+        { p: 'Rozmowy: gdy dołączasz do rozmowy przestrzeni, dźwięk z Twojego mikrofonu i, jeśli ją włączysz, obraz z kamery trafiają bezpośrednio do pozostałych uczestników (peer to peer, szyfrowane między urządzeniami). Jeśli w rozmowie jest członek z Premium, rozmowa może iść przez Cloudflare: przez przekaźnik TURN, który przekazuje zaszyfrowane media dalej, albo, przy ponad czterech osobach, przez SFU Cloudflare Realtime, które je przesyła; połączenie z SFU jest szyfrowane, ale SFU ma dostęp do przesyłanych mediów. Peerly nie nagrywa rozmów. Kanał przestrzeni wie, kto jest w rozmowie, i przekazuje zestawianie połączeń; na potrzeby CodeFusion Console zapisujemy czas trwania, ilość danych i wskaźniki jakości każdego połączenia rozmowy, bez jego treści i adresu IP.' },
         { p: 'Twoje imię w przestrzeni: imię, którym się logujesz, jest wysyłane w postaci zaszyfrowanej do członków, których spotykasz. Ich urządzenia zapamiętują imiona widziane w tej przestrzeni i mogą przekazać je członkom, którzy Cię jeszcze nie widzieli.' },
         { p: 'Adres IP: aby połączyć się bezpośrednio, urządzenia członków wymieniają przez kanał przestrzeni swoje adresy sieciowe (kandydatów ICE), w tym publiczny adres, który ustala serwer STUN Cloudflare. Pozostali członkowie Twoich przestrzeni mogą więc poznać Twój adres IP, a z niego przybliżoną lokalizację i dostawcę internetu. Połączenia konta Premium mogą zamiast tego iść przez przekaźnik TURN Cloudflare; wtedy Twój adres IP i metadane połączenia widzi Cloudflare, a pozostali członkowie widzą adres przekaźnika. Przekazujemy te adresy tylko członkom tej samej przestrzeni i ich nie przechowujemy.' },
         { p: 'Twój plan: przechowujemy identyfikator konta, datę pierwszego i ostatniego logowania (aktualizowaną najwyżej raz na godzinę), plan, datę jego zakończenia, kto z naszego zespołu go przyznał i kiedy oraz opcjonalną notatkę. Nasz zespół odnajduje konto po identyfikatorze widocznym w Ustawieniach, który podajesz, pytając o swój plan.' },
@@ -209,7 +212,8 @@ const privacyPl: LegalDoc = {
         { ul: [
           'Cloudflare Workers i Durable Objects: logowanie, sesje, urządzenia, kanały przestrzeni, zaszyfrowana historia, plany.',
           'Cloudflare R2: zapieczętowane pliki przestrzeni Premium.',
-          'Cloudflare STUN i TURN: ustalanie publicznego adresu urządzenia do połączeń bezpośrednich i przekazywanie połączeń kont Premium.',
+          'Cloudflare STUN i TURN: ustalanie publicznego adresu urządzenia do połączeń bezpośrednich i przekazywanie połączeń i rozmów kont Premium.',
+          'Cloudflare Realtime SFU: przesyłanie mediów rozmów z członkiem Premium i ponad czterema osobami.',
           'Cloudflare Static Assets: serwowanie plików aplikacji.',
           'Cloudflare Workers Analytics Engine i D1, przez CodeFusion Console: diagnostyka, raporty błędów i liczba odsłon.',
           'Dostawcy tożsamości (Google, Microsoft, Apple lub Twojej organizacji): logowanie.',
@@ -226,7 +230,7 @@ const privacyPl: LegalDoc = {
           'Identyfikatory członków przestrzeni: dopóki przestrzeń jest używana; nowsza lista je zastępuje.',
           'Historia przestrzeni Premium: ostatnie 5000 zmian i jej zapieczętowane pliki, dopóki trwa Premium właściciela; oba są usuwane, gdy Premium się kończy.',
           'Identyfikator konta, urządzenia i plan: dopóki nie poprosisz o usunięcie konta.',
-          'Raporty błędów: 30 dni; statystyki żądań, diagnostyki i odsłon: 3 miesiące; dzienniki żądań Cloudflare: 7 dni.',
+          'Raporty błędów: 30 dni; statystyki żądań, diagnostyki, rozmów i odsłon: 3 miesiące; dzienniki żądań Cloudflare: 7 dni.',
         ] },
       ],
     },
@@ -277,7 +281,7 @@ const termsEn: LegalDoc = {
     { heading: '2. Age', blocks: [{ p: `You must be at least ${m.minAge}.` }] },
     { heading: '3. The service', blocks: [
       { p: 'Peerly connects the members of invite-only workspaces. Their devices pass what they write directly to each other, so without Premium a message reaches a member only while someone who has it is online.' },
-      { p: 'Premium keeps the encrypted history and files of the workspaces you own on our servers (up to 5 GB of files each), so members get them whenever they come back, and lets your connections go through a relay when a direct one fails. Our team grants Premium for now, for the time it states, and may end it; we will tell you before charging for anything.' },
+      { p: 'Premium keeps the encrypted history and files of the workspaces you own on our servers (up to 5 GB of files each), so members get them whenever they come back, lets your connections and calls go through a relay when a direct one fails, and carries calls of more than four people through an SFU. Our team grants Premium for now, for the time it states, and may end it; we will tell you before charging for anything.' },
     ] },
     { heading: '4. Your account and devices', blocks: [
       { p: 'You sign in through a third-party identity provider and are responsible for your account and the devices you approve. Approve a new device only when it is yours: a linked device holds your account’s keys and can change the lists of workspaces you own.' },
@@ -318,7 +322,7 @@ const termsPl: LegalDoc = {
     { heading: '2. Wiek', blocks: [{ p: `Musisz mieć co najmniej ${m.minAge} lat.` }] },
     { heading: '3. Usługa', blocks: [
       { p: 'Peerly łączy członków przestrzeni dostępnych tylko dla zaproszonych. Ich urządzenia przekazują sobie bezpośrednio to, co piszą, więc bez Premium wiadomość dociera do członka tylko wtedy, gdy ktoś, kto ją ma, jest online.' },
-      { p: 'Premium przechowuje na naszych serwerach zaszyfrowaną historię i pliki przestrzeni należących do Ciebie (do 5 GB plików w każdej), aby członkowie otrzymywali je po powrocie, i pozwala Twoim połączeniom iść przez przekaźnik, gdy bezpośrednie się nie uda. Na razie Premium przyznaje nasz zespół, na wskazany przez siebie czas, i może je zakończyć; zanim zaczniemy za cokolwiek pobierać opłaty, poinformujemy Cię o tym.' },
+      { p: 'Premium przechowuje na naszych serwerach zaszyfrowaną historię i pliki przestrzeni należących do Ciebie (do 5 GB plików w każdej), aby członkowie otrzymywali je po powrocie, pozwala Twoim połączeniom i rozmowom iść przez przekaźnik, gdy bezpośrednie się nie uda, i przesyła rozmowy ponad czterech osób przez SFU. Na razie Premium przyznaje nasz zespół, na wskazany przez siebie czas, i może je zakończyć; zanim zaczniemy za cokolwiek pobierać opłaty, poinformujemy Cię o tym.' },
     ] },
     { heading: '4. Twoje konto i urządzenia', blocks: [
       { p: 'Logujesz się przez zewnętrznego dostawcę tożsamości i odpowiadasz za swoje konto oraz zatwierdzane urządzenia. Zatwierdzaj nowe urządzenie tylko wtedy, gdy jest Twoje: połączone urządzenie ma klucze Twojego konta i może zmieniać listy przestrzeni należących do Ciebie.' },
