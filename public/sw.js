@@ -1,5 +1,5 @@
-const CACHE = 'peerly-shell-v3'
-const SHELL = ['/', '/site.webmanifest', '/icon-192.png', '/icon-512.png']
+const CACHE = 'peerly-shell-v4'
+const SHELL = ['/', '/theme.js', '/site.webmanifest', '/icon-192.png', '/icon-512.png', '/app-icon.png']
 const MAX_RUNTIME_ASSETS = 60
 
 async function cacheAsset(request, response) {

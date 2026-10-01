@@ -1,7 +1,7 @@
 {
   "name": "Peerly",
   "short_name": "Peerly",
-  "description": "Serverless peer-to-peer team collaboration",
+  "description": "Team chat, files and calls that go straight between you",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -19,7 +19,7 @@
       "purpose": "any maskable"
     }
   ],
-  "theme_color": "#2b6cb0",
-  "background_color": "#0f172a",
+  "theme_color": "#7139cb",
+  "background_color": "#f9f9fd",
   "display": "standalone"
 }

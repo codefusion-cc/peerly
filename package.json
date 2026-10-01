@@ -30,7 +30,7 @@
     "dev": "node scripts/dev.mjs",
     "build": "VITE_APP_ID=peerly tsc -b && VITE_APP_ID=peerly vite build && npm run guard:bundle",
     "build:preview": "VITE_APP_ID=peerly tsc -b && VITE_APP_ID=peerly vite build --outDir dist-preview && node scripts/guard-bundle.mjs dist-preview",
-    "build:e2e": "VITE_APP_ID=peerly VITE_E2E_AUTH=true tsc -b && VITE_APP_ID=peerly VITE_E2E_AUTH=true vite build --outDir dist-e2e && node scripts/check-e2e-fixtures.mjs dist-e2e",
+    "build:e2e": "VITE_APP_ID=peerly VITE_E2E_AUTH=true tsc -b && VITE_APP_ID=peerly VITE_E2E_AUTH=true vite build --outDir dist-e2e && VITE_E2E_AUTH=true node scripts/check-e2e-fixtures.mjs dist-e2e",
     "guard:bundle": "node scripts/guard-bundle.mjs dist",
     "typecheck": "VITE_APP_ID=peerly tsc -b",
     "lint": "oxlint",
@@ -62,7 +62,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
     "@cloudflare/vitest-plugin": "^1.2.1",
-    "@playwright/test": "^1.52.0",
+    "@playwright/test": "^1.63.0",
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@tailwindcss/vite": "^4.3.2",

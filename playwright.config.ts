@@ -1,56 +1,43 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Parallelism: each worker gets its own workspace/room (see e2eWorkspaceId in
- * e2e/helpers.ts), so workers never meet over the shared local relay. The
- * Nostr subset stays serial — dozens of concurrent connections from one IP is
- * exactly what public relays throttle.
+ * The browser suite: the e2e build on the real Worker (scripts/e2e-server.mjs),
+ * signing in with the loopback test issuer. Each test makes its own people and
+ * workspaces, so tests run in parallel without meeting each other.
  */
-const nostr = process.env.E2E_SIGNALING === 'nostr'
-
 export default defineConfig({
   testDir: './e2e',
-  // The Durable Objects suite has its own config, its own target and its own
-  // port. Without this it also runs here, against the relay server, where it
-  // cannot pass — and it fails slowly enough to starve the rest of the run.
-  testIgnore: /durable-objects\.spec\.ts/,
-  // Keep wall-clock failure budget tight: a blocked UI (e.g. consent banner
-  // over Send) should fail in ~30–45s, not 90s × 2 retries × many tests.
   timeout: 45_000,
   expect: { timeout: 15_000 },
-  fullyParallel: !nostr,
-  workers: nostr ? 1 : process.env.CI ? 2 : 4,
-  // One retry on CI only: genuine regressions fail twice; local runs fail once.
+  fullyParallel: true,
+  workers: process.env.CI ? 2 : 4,
   retries: process.env.CI ? 1 : 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:17273',
+    locale: 'en-US',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    permissions: ['camera', 'microphone'],
   },
   projects: [
     {
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        permissions: ['clipboard-read', 'clipboard-write'],
         launchOptions: {
           chromiumSandbox: false,
-          args: [
-            '--use-fake-ui-for-media-stream',
-            '--use-fake-device-for-media-stream',
-            '--disable-features=WebRtcHideLocalIpsWithMdns',
-            '--allow-insecure-localhost',
-          ],
+          // Two browser contexts on one machine reach each other over loopback, as they would on a LAN.
+          args: ['--disable-features=WebRtcHideLocalIpsWithMdns'],
         },
       },
     },
   ],
   webServer: {
-    command: 'node server/test-server.mjs',
-    url: 'http://127.0.0.1:17273',
+    command: 'node scripts/e2e-server.mjs',
+    url: 'http://127.0.0.1:17273/api/auth/providers',
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: 180_000,
   },
 })

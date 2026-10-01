@@ -33,6 +33,8 @@ jobs:
 
       - run: npm run lint
 
+      - run: npm run typecheck
+
       - run: npm test
 
       - run: npm run test:workers
@@ -52,6 +54,5 @@ jobs:
 
       - run: npm run check:csp
 
+      # The e2e build on the real Worker: two browsers chatting peer to peer, access, and axe in both themes.
       - run: npm run test:e2e
-
-      - run: npm run test:e2e:do

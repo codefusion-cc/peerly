@@ -108,22 +108,24 @@ export function ChannelView({ account, workspace, session, view, channel }: {
               <p className="text-base-content/70">{view.history ? t.channelStartHistory : t.channelStartP2p}</p>
             </div>
           )}
-          <ol role="log" aria-label={t.messagesIn(channel.name)} aria-live="polite" aria-relevant="additions" className="space-y-0.5">
-            {groups.map(group => (
-              <Fragment key={group.messages[0].id}>
-                {group.startsDay && (
-                  <li className="divider my-4 text-xs font-medium text-base-content/60" role="separator">{day.format(group.messages[0].at)}</li>
-                )}
-                {group.messages.map((message, index) => (
-                  <MessageItem key={message.id} message={message} first={index === 0} account={account}
-                    author={names(message.by)} names={names}
-                    replyTo={message.reply ? byId.get(message.reply) ?? null : null}
-                    replyAuthor={message.reply ? names(byId.get(message.reply)?.by ?? '') : ''}
-                    onReply={onReply} onEdit={onEdit} onDelete={setDeleting} onReact={onReact} />
-                ))}
-              </Fragment>
-            ))}
-          </ol>
+          <div role="log" aria-label={t.messagesIn(channel.name)} aria-live="polite" aria-relevant="additions">
+            <ol className="space-y-0.5">
+              {groups.map(group => (
+                <Fragment key={group.messages[0].id}>
+                  {group.startsDay && (
+                    <li className="divider my-4 text-xs font-medium text-base-content/60">{day.format(group.messages[0].at)}</li>
+                  )}
+                  {group.messages.map((message, index) => (
+                    <MessageItem key={message.id} message={message} first={index === 0} account={account}
+                      author={names(message.by)} names={names}
+                      replyTo={message.reply ? byId.get(message.reply) ?? null : null}
+                      replyAuthor={message.reply ? names(byId.get(message.reply)?.by ?? '') : ''}
+                      onReply={onReply} onEdit={onEdit} onDelete={setDeleting} onReact={onReact} />
+                  ))}
+                </Fragment>
+              ))}
+            </ol>
+          </div>
         </div>
         {unseen > 0 && (
           <button type="button" onClick={() => scrollToBottom(true)}

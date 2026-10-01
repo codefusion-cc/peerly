@@ -12,3 +12,8 @@ createRoot(document.getElementById('root')!).render(
     </I18nProvider>
   </StrictMode>,
 )
+
+// The app shell works offline once loaded (public/sw.js): workspaces and messages live on the device.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => { void navigator.serviceWorker.register('/sw.js').catch(() => {}) })
+}

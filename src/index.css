@@ -16,28 +16,29 @@
   prefersdark: false;
   color-scheme: light;
 
+  /* Every colour is inside sRGB and pairs with its -content colour at 4.6:1 or more (WCAG AA for text). */
   --color-base-100: oklch(99.5% 0.003 275);
   --color-base-200: oklch(97.4% 0.007 275);
   --color-base-300: oklch(92% 0.013 275);
   --color-base-content: oklch(26% 0.03 270);
 
-  --color-primary: oklch(52% 0.22 295);
+  --color-primary: oklch(50% 0.21 295);
   --color-primary-content: oklch(99% 0.005 295);
-  --color-secondary: oklch(56% 0.17 248);
+  --color-secondary: oklch(53% 0.14 248);
   --color-secondary-content: oklch(99% 0.005 245);
-  --color-accent: oklch(60% 0.12 185);
+  --color-accent: oklch(53% 0.09 185);
   --color-accent-content: oklch(99% 0.01 185);
   --color-neutral: oklch(32% 0.03 270);
   --color-neutral-content: oklch(98% 0.005 270);
 
-  --color-info: oklch(56% 0.17 248);
+  --color-info: oklch(53% 0.14 248);
   --color-info-content: oklch(99% 0.005 245);
-  --color-success: oklch(58% 0.13 165);
+  --color-success: oklch(52% 0.105 165);
   --color-success-content: oklch(99% 0.005 165);
-  --color-warning: oklch(72% 0.16 70);
+  --color-warning: oklch(72% 0.155 70);
   --color-warning-content: oklch(24% 0.05 70);
   --color-error: oklch(56% 0.21 25);
-  --color-error-content: oklch(99% 0.005 25);
+  --color-error-content: oklch(99% 0 25);
 
   --radius-selector: 0.625rem;
   --radius-field: 0.625rem;
@@ -60,19 +61,19 @@
   --color-base-300: oklch(25% 0.026 275);
   --color-base-content: oklch(93% 0.012 275);
 
-  --color-primary: oklch(72% 0.17 295);
+  --color-primary: oklch(72% 0.16 295);
   --color-primary-content: oklch(17% 0.04 295);
   --color-secondary: oklch(74% 0.13 245);
   --color-secondary-content: oklch(17% 0.035 245);
   --color-accent: oklch(76% 0.11 185);
-  --color-accent-content: oklch(16% 0.035 185);
+  --color-accent-content: oklch(16% 0.025 185);
   --color-neutral: oklch(30% 0.03 270);
   --color-neutral-content: oklch(94% 0.01 270);
 
   --color-info: oklch(74% 0.13 245);
   --color-info-content: oklch(16% 0.035 245);
   --color-success: oklch(74% 0.12 165);
-  --color-success-content: oklch(15% 0.035 165);
+  --color-success-content: oklch(15% 0.03 165);
   --color-warning: oklch(80% 0.13 75);
   --color-warning-content: oklch(19% 0.04 75);
   --color-error: oklch(72% 0.16 25);
