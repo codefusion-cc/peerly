@@ -7,12 +7,18 @@ server's resources:
 | | Free | Premium |
 |---|---|---|
 | Messages between members online | ✓ | ✓ |
+| Files between members online | ✓ | ✓ |
 | History kept for the workspaces the account **owns** (latest 5,000 changes, encrypted) | | ✓ |
+| Files kept in the cloud for those workspaces (sealed on the device, up to 5 GB each, R2) | | ✓ |
 | Connections relayed through Cloudflare TURN when a direct one fails | | ✓ |
 
 - **History follows the owner's plan.** Only the owner's session sets a workspace channel's history, from the
   owner's plan and its end date; a member's plan does not change it. When the plan ends (its date passes or staff
-  end it), the channel deletes everything it kept and members carry the content again.
+  end it), the channel deletes everything it kept, files included, and members carry the content again.
+- **Cloud files** ([worker/channel.ts](../worker/channel.ts), `cloudFiles` of `defineAuthorizedChannel`): the
+  sender's device seals each file with a key from the workspace's secret and stores it under an id derived from
+  the same secret (`/api/realtime/files/<route>/<id>`). Only a member connected to the workspace's channel may
+  store or read one; the server never learns which file it is.
 - **Relays follow the account's own plan** ([worker/ice.ts](../worker/ice.ts)): STUN for everyone, TURN
   credentials for a Premium account, renewed before they expire and rate limited.
 

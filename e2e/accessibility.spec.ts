@@ -36,6 +36,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
     await createWorkspace(ala.page, 'Checks', [])
     await send(ala.page, 'A message with a link: https://example.com')
+    await ala.page.locator('input[type=file]').setInputFiles([
+      { name: 'a.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') },
+      { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('notes') },
+      { name: 'huge.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(0) },
+    ])
+    await expect(ala.page.getByRole('list', { name: 'Files to send' }).getByText('Preparing…')).toHaveCount(0)
+    await accessible(ala.page, 'composer with files')
+    await send(ala.page, 'With files')
     await accessible(ala.page, 'channel')
 
     // Every colour an avatar can take, as the avatar draws its initials (a random account gets only one).
@@ -68,8 +76,10 @@ test('the channel works with the keyboard alone', async ({ browser }) => {
   await send(ala.page, 'First')
   const box = ala.page.getByRole('textbox', { name: 'Message #general' })
 
-  // From the box, Shift+Tab reaches the message; Tab then walks its actions, and the menu opens on its first item.
+  // From the box, Shift+Tab passes the paperclip and reaches the message; Tab then walks its actions, and the menu opens on its first item.
   await box.focus()
+  await ala.page.keyboard.press('Shift+Tab')
+  await expect(ala.page.locator(':focus')).toHaveAccessibleName('Attach files')
   await ala.page.keyboard.press('Shift+Tab')
   await expect(ala.page.locator(':focus')).toContainText('First')
   await ala.page.keyboard.press('Tab')

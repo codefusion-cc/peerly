@@ -31,6 +31,8 @@ While you are online: the workspace’s channel (a Cloudflare Durable Object) kn
 
 Content: messages, edits, deletions, reactions, channel names and the workspace’s name are signed by the device that wrote them and encrypted. They go directly to the members’ devices. If the workspace’s owner has Premium, its channel also keeps encrypted copies of the latest 5,000 changes, so members get them when they come back; this history ends when the owner’s Premium does.
 
+Files: a file you attach is kept on your device and goes directly to the members who open it; its name, type, size and, for an image, a small preview travel inside the encrypted message. Members’ devices keep the files they open and pass them to other members who ask. If the workspace’s owner has Premium, your device also seals each file with the workspace’s key and stores it in Cloudflare R2 under a name derived from the key, so members can get it while nobody who has it is online. We cannot open these files or tell which file one is; we see their size and when they were stored. Each workspace may keep up to 5 GB, and the files are deleted when the owner’s Premium ends.
+
 Your name in a workspace: the name you signed in with is sent, encrypted, to the members you meet. Their devices remember the names they have seen in that workspace, and may pass them to other members who have not seen you.
 
 IP address: to connect directly, members’ devices exchange their network addresses (ICE candidates) through the workspace’s channel, including the public address Cloudflare’s STUN server finds. The other members of your workspaces can therefore learn your IP address, and from it your approximate location and internet provider. A Premium account’s connections may go through Cloudflare’s TURN relay instead; Cloudflare then sees your IP address and the connection’s metadata, and the other members see the relay’s address. We pass these addresses only to members of the same workspace and do not keep them.
@@ -43,7 +45,7 @@ Error reports: if the app fails in your browser, it sends us the error message a
 
 Page views: each page of the app sends an anonymous view: which page it was (never a workspace, channel or account), the site or campaign that sent you, whether the view comes from a signed-in account, and whether the device is a phone, tablet or computer. The service adds the country, region and city Cloudflare estimates from your connection. Views carry no IP address, cookie or identifier, so they cannot be linked to each other or to you; we count them only in total.
 
-On your device: your workspaces (their secrets and member lists), the messages and changes your device holds, the names it has seen, the device’s key and, once linked, your account’s keys (in IndexedDB); who is signed in, your theme, language and clock choices (in local storage); unsent drafts (for the tab only); and the app’s own files, so it opens offline (in the service worker’s cache).
+On your device: your workspaces (their secrets and member lists), the messages, changes and files your device holds, the names it has seen, the device’s key and, once linked, your account’s keys (in IndexedDB); who is signed in, your theme, language and clock choices (in local storage); unsent drafts (for the tab only); and the app’s own files, so it opens offline (in the service worker’s cache).
 
 > No advertising, no tracking pixels, no visitor IDs, no profiling. We do not sell data.
 
@@ -63,6 +65,7 @@ On your device: your workspaces (their secrets and member lists), the messages a
 ## 6. Processors
 
 - Cloudflare Workers and Durable Objects: sign-in, sessions, devices, workspace channels, encrypted history, plans.
+- Cloudflare R2: a Premium workspace’s sealed files.
 - Cloudflare STUN and TURN: finding a device’s public address for direct connections, and relaying a Premium account’s connections.
 - Cloudflare Static Assets: serving the app’s files.
 - Cloudflare Workers Analytics Engine and D1, through CodeFusion Console: diagnostics, error reports and page view counts.
@@ -75,7 +78,7 @@ Cloudflare may process data outside the European Economic Area under the EU Stan
 - On your devices: until you leave the workspace, clear messages in Settings → Storage, or clear the browser’s data. Signing out keeps them for when you sign in again.
 - Sessions: until they expire (30 days without use) or you sign out. Linked devices: until you unlink them.
 - A workspace’s member IDs: while the workspace is used; a newer list replaces them.
-- A Premium workspace’s history: the latest 5,000 changes, while the owner’s Premium lasts; it is deleted when Premium ends.
+- A Premium workspace’s history: the latest 5,000 changes, and its sealed files, while the owner’s Premium lasts; both are deleted when Premium ends.
 - Your account ID, devices and plan: until you ask us to delete your account.
 - Error reports: 30 days; request, diagnostics and page view statistics: 3 months; Cloudflare’s request logs: 7 days.
 

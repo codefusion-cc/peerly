@@ -25,6 +25,8 @@ import {
   bindDevice, bindingKey, boundDevices, channelWindow, daySummary, idsOfDay, metaOps, opsById, putOps, WINDOW,
 } from '../content/opStore.ts'
 import { createSync, parseSyncMessage, type SyncMessage } from '../content/sync.ts'
+import type { PreparedFile } from '../files/prepare.ts'
+import { WorkspaceFiles } from '../files/workspaceFiles.ts'
 import { authorizeWorkspace, isListed, receiveList, setupDone, type Workspace } from './workspaces.ts'
 
 export type Presence = { userId: string; deviceKeyIds: string[] }
@@ -123,11 +125,18 @@ export class WorkspaceSession {
   }, (to, message) => { this.meshSend(message, to) })
 
   private readonly defaultChannelName: string
+  private routeId: string | null = null
+  /** The workspace's files on this device (and in the cloud, for a Premium owner's workspace). */
+  readonly files: WorkspaceFiles
 
   constructor(account: Account, workspace: Workspace, defaultChannelName = 'general') {
     this.account = account
     this.workspace = workspace
     this.defaultChannelName = defaultChannelName
+    this.files = new WorkspaceFiles({
+      userId: account.userId, workspaceId: workspace.id, secret: workspace.secret,
+      routeId: () => this.routeId, history: () => this.state.history, mesh: () => this.mesh,
+    })
     this.state = {
       status: 'connecting', refused: null, history: false, online: [], peers: [], channels: [], name: workspace.name,
       profiles: { ...readNames(account.userId, workspace.id), [account.userId]: { name: account.name } }, typing: {},
@@ -183,6 +192,7 @@ export class WorkspaceSession {
         encryptionSecret: this.workspace.secret,
         authorize: async () => {
           const answer = await authorizeWorkspace(this.workspace)
+          this.routeId = answer.routeId
           this.set({ history: answer.history })
           return { routeId: answer.routeId }
         },
@@ -210,6 +220,8 @@ export class WorkspaceSession {
       signalEvent: 'p2p',
       onMessage: (message, from) => void this.meshReceived(message as MeshMessage, from),
       onPeers: peers => this.peersChanged(peers),
+      // Members online ask each other for files by hash; the mesh checks what comes back.
+      provide: hash => this.files.provide(hash),
     })
     this.scheduleIce(ice.ttlMs)
     this.refreshOnline()
@@ -223,6 +235,7 @@ export class WorkspaceSession {
     for (const timer of this.typingTimers.values()) clearTimeout(timer)
     this.mesh?.close()
     this.room?.leave()
+    this.files.close()
     this.listeners.clear()
   }
 
@@ -437,6 +450,17 @@ export class WorkspaceSession {
   send(channelId: string, text: string, files: FileRef[] = [], reply?: string) {
     return this.publish({ kind: 'msg', c: channelId, text, ...(files.length ? { files } : {}), ...(reply ? { reply } : {}) })
   }
+  /**
+   * Sends a message with files: keeps them here, puts sealed copies in the
+   * cloud when the workspace keeps history, then sends the message. Answers
+   * how many files the cloud did not keep (members get those from this device).
+   */
+  async sendWithFiles(channelId: string, text: string, files: PreparedFile[], reply?: string, onProgress?: (fraction: number) => void) {
+    const { refs, notKept } = await this.files.prepareToSend(files, onProgress)
+    await this.send(channelId, text, refs, reply)
+    return { notKept }
+  }
+
   edit(messageId: string, text: string) { return this.publish({ kind: 'edit', target: messageId, text }) }
   remove(messageId: string) { return this.publish({ kind: 'del', target: messageId }) }
   react(messageId: string, emoji: string, on: boolean) { return this.publish({ kind: 'react', target: messageId, emoji, on }) }

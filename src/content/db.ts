@@ -9,14 +9,14 @@
 import { APP_ID } from '../config.ts'
 import type { Op } from './ops.ts'
 
-const VERSION = 1
+const VERSION = 2
 
 /** A verified op as kept: its workspace (this device's id for it), and its UTC day for reconciling with peers. */
 export type StoredOp = Op & { w: string; day: number }
 /** An op whose author's device is not yet known to be theirs: kept apart, unseen and not passed on, until it is. */
 export type PendingOp = Op & { w: string }
 
-export type StoredBlob = { hash: string; w: string; blob: Blob; size: number; type: string; at: number }
+export type StoredBlob = { w: string; hash: string; blob: Blob; size: number; at: number }
 export type DeviceBinding = { key: string; userId: string; deviceKeyId: string; at: number }
 
 let opening: Promise<IDBDatabase> | null = null
@@ -29,20 +29,26 @@ export function contentDb(userId: string): Promise<IDBDatabase> {
   openFor = userId
   opening = new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(`${APP_ID}-content-${userId}`, VERSION)
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = event => {
       const db = request.result
-      const ops = db.createObjectStore('ops', { keyPath: 'id' })
-      ops.createIndex('byChannel', ['w', 'c', 'at'])
-      ops.createIndex('byDay', ['w', 'day'])
-      ops.createIndex('byTarget', ['w', 'target'])
-      ops.createIndex('byKind', ['w', 'kind'])
-      ops.createIndex('byWorkspace', 'w')
-      const pending = db.createObjectStore('pending', { keyPath: 'id' })
-      pending.createIndex('byDevice', ['by', 'dk'])
-      pending.createIndex('byWorkspace', 'w')
-      const blobs = db.createObjectStore('blobs', { keyPath: 'hash' })
-      blobs.createIndex('byWorkspace', 'w')
-      db.createObjectStore('devices', { keyPath: 'key' })
+      if (event.oldVersion < 1) {
+        const ops = db.createObjectStore('ops', { keyPath: 'id' })
+        ops.createIndex('byChannel', ['w', 'c', 'at'])
+        ops.createIndex('byDay', ['w', 'day'])
+        ops.createIndex('byTarget', ['w', 'target'])
+        ops.createIndex('byKind', ['w', 'kind'])
+        ops.createIndex('byWorkspace', 'w')
+        const pending = db.createObjectStore('pending', { keyPath: 'id' })
+        pending.createIndex('byDevice', ['by', 'dk'])
+        pending.createIndex('byWorkspace', 'w')
+        db.createObjectStore('devices', { keyPath: 'key' })
+      }
+      if (event.oldVersion < 2) {
+        // Version 1 kept a file once for every workspace; files are per workspace now, each served only there.
+        if (db.objectStoreNames.contains('blobs')) db.deleteObjectStore('blobs')
+        const blobs = db.createObjectStore('blobs', { keyPath: ['w', 'hash'] })
+        blobs.createIndex('byWorkspace', 'w')
+      }
     }
     request.onsuccess = () => {
       const db = request.result

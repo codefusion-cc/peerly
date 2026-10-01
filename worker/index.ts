@@ -6,8 +6,8 @@
  */
 import { createConsoleRoutes, isConsoleRoute } from '@codefusion-cc/console/worker'
 import { handleGoogleSignIn } from '@codefusion-cc/google-sign-in'
-import { handleRealtimeRoute, prepareAuthenticatedRealtimeUpgrade, type RealtimeRouteConfig } from '@codefusion-cc/realtime'
-import { APP_ID, ROUTES } from '../shared/app.ts'
+import { handleChannelFile, handleRealtimeRoute, prepareAuthenticatedRealtimeUpgrade, type RealtimeRouteConfig } from '@codefusion-cc/realtime'
+import { APP_ID, LIMITS, ROUTES } from '../shared/app.ts'
 import { handleSignInCallback } from './signInCallback.ts'
 import { handleIceServers } from './ice.ts'
 import { signInOptions, signInVerifier, type SignInEnv } from './signInProviders.ts'
@@ -101,6 +101,10 @@ export default {
       return env.CHANNELS.getByName(routeId).fetch(prepared.request)
     }
     if (url.pathname === ROUTES.iceServers) return handleIceServers(request, env as never)
+    const file = await handleChannelFile(request, env as never, config, {
+      prefix: ROUTES.files, channels: 'CHANNELS', bucket: 'FILES', maxFileBytes: LIMITS.cloudFileBytes, uploads: 'FILES_RATE_LIMITER',
+    })
+    if (file) return file
 
     const realtime = await handleRealtimeRoute(request, env as never, config)
     if (realtime) return realtime

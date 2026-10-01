@@ -9,8 +9,11 @@
  *   the latest `channel` and `workspace` state), so a member who was away gets
  *   it without anyone else online. Without it nothing is stored.
  * - `profile` and `typing` are live only.
+ * - With history on, files go to the cloud too (R2, `FILES`), sealed with the
+ *   workspace's key; when history ends they are deleted with it.
  */
 import { defineAuthorizedChannel } from '@codefusion-cc/realtime'
+import { LIMITS } from '../shared/app.ts'
 
 export const CHANNEL_EVENTS = Object.freeze({
   /** WebRTC signals, to one connection. */
@@ -36,4 +39,6 @@ export const Channel = defineAuthorizedChannel({
   // 64 KiB: a message with a few image previews, encrypted.
   maxFrameBytes: 64 * 1024,
   maxMembers: 500,
+  // Files kept for members who were away, sealed on the page (handleChannelFile serves them).
+  cloudFiles: { bucket: 'FILES', maxBytes: LIMITS.cloudBytesPerWorkspace, maxFileBytes: LIMITS.cloudFileBytes },
 })

@@ -28,8 +28,12 @@ How it works: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** · what Premium a
 - **Peer to peer by default.** Members' devices pass signed, encrypted changes (messages, edits, deletions,
   reactions, channels) over WebRTC, and catch each other up when they meet. Nothing anyone writes is kept on the
   server.
-- **Premium** keeps an owner's workspaces' encrypted history (latest 5,000 changes) so members get it whenever
-  they come back, and gives the account Cloudflare TURN relays. Staff grant it from CodeFusion Console.
+- **Files** go peer to peer too: attach from the paperclip, a paste or a drop (up to 10 a message, 100 MB each);
+  images show their preview at once and arrive by themselves, any file is saved exactly as sent, checked by its
+  SHA-256.
+- **Premium** keeps an owner's workspaces' encrypted history (latest 5,000 changes) and files (sealed on the
+  device, up to 5 GB a workspace, in R2) so members get them whenever they come back, and gives the account
+  Cloudflare TURN relays. Staff grant it from CodeFusion Console.
 - **Channels** with replies, reactions, edits and deletions, safe HTTPS links, typing, presence and direct-link
   status; drafts per channel; keyboard first (Enter, Shift+Enter, ↑ to edit, Escape).
 - **Linked devices** with a six-digit code compared on both screens; a linked device holds the account's keys.
@@ -37,9 +41,8 @@ How it works: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** · what Premium a
 - **English and Polish**, light and dark themes, phone to desktop, WCAG 2.2 AA checked by axe in the browser
   suite, an offline app shell, and a strict Content-Security-Policy.
 
-Being ported from Peerly 1.x before 2.0 replaces it in production: files (peer to peer, and Premium cloud files on
-R2), calls (peer to peer, Premium through TURN and the SFU), direct messages, unread attention and notifications,
-workspace backups and local media screening.
+Being ported from Peerly 1.x before 2.0 replaces it in production: calls (peer to peer, Premium through TURN and
+the SFU), direct messages, unread attention and notifications, workspace backups and local media screening.
 
 ## Develop
 
@@ -79,7 +82,8 @@ GitHub cannot be offered: it has no OpenID Connect sign-in with a verified email
 Cloudflare Workers Builds deploys `main`: [wrangler.jsonc](wrangler.jsonc) as `peerly` (peerly.cc) and
 [wrangler.preview.jsonc](wrangler.preview.jsonc) as `peerly-preview` (preview.peerly.cc), each with its own
 secrets: `NETWORK_SESSION_SECRET`, `OPAQUE_USER_ID_SECRET` (never rotated: ids derive from it),
-`TURN_KEY_ID` and `TURN_KEY_API_TOKEN` (a Cloudflare Realtime TURN key). Durable Object migrations apply with a
+`TURN_KEY_ID` and `TURN_KEY_API_TOKEN` (a Cloudflare Realtime TURN key), and its R2 bucket for Premium files
+(`peerly-files`, `peerly-files-preview`), which must exist before the deploy. Durable Object migrations apply with a
 full deploy, so they reach production on merge. Branches get Worker previews.
 
 The Worker reports to CodeFusion Console: its tail consumer, page failures and anonymous view counts

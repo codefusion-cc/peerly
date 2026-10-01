@@ -19,7 +19,7 @@ You must be at least 16.
 
 Peerly connects the members of invite-only workspaces. Their devices pass what they write directly to each other, so without Premium a message reaches a member only while someone who has it is online.
 
-Premium keeps the encrypted history of the workspaces you own on our servers, so members get it whenever they come back, and lets your connections go through a relay when a direct one fails. Our team grants Premium for now, for the time it states, and may end it; we will tell you before charging for anything.
+Premium keeps the encrypted history and files of the workspaces you own on our servers (up to 5 GB of files each), so members get them whenever they come back, and lets your connections go through a relay when a direct one fails. Our team grants Premium for now, for the time it states, and may end it; we will tell you before charging for anything.
 
 ## 4. Your account and devices
 

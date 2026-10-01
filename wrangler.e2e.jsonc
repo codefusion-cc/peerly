@@ -23,7 +23,13 @@
   "ratelimits": [
     { "name": "AUTH_RATE_LIMITER", "namespace_id": "1098", "simple": { "limit": 1000, "period": 60 } },
     { "name": "AUTH_IP_RATE_LIMITER", "namespace_id": "1097", "simple": { "limit": 1000, "period": 60 } },
+    // Cloud file uploads, per account.
+    { "name": "FILES_RATE_LIMITER", "namespace_id": "1094", "simple": { "limit": 30, "period": 60 } },
     { "name": "MEDIA_RATE_LIMITER", "namespace_id": "1096", "simple": { "limit": 100, "period": 60 } }
+  ],
+  // Premium workspaces' files, sealed on the page; a channel deletes them when its history ends.
+  "r2_buckets": [
+    { "binding": "FILES", "bucket_name": "peerly-files-e2e" }
   ],
   "durable_objects": {
     "bindings": [

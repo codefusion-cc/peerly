@@ -107,3 +107,75 @@ test('a changed invite link is refused', async ({ browser }) => {
   await ala.context.close()
   await bob.context.close()
 })
+
+test('files go between members directly: an image shows by itself, any file can be saved as it was sent', async ({ browser }) => {
+  const ala = await signIn(browser, 'ala')
+  const bob = await signIn(browser, 'bob')
+  await createWorkspace(ala.page, 'Files', [bob.email])
+  await join(bob, await inviteLink(ala.page, 'Files'))
+  await linked(ala.page)
+
+  // A real PNG (drawn in the page), and a text file with Polish letters.
+  const png = await ala.page.evaluate(async () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 320
+    canvas.height = 200
+    const context = canvas.getContext('2d')!
+    context.fillStyle = '#0ea5e9'
+    context.fillRect(0, 0, 320, 200)
+    const blob = await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!), 'image/png'))
+    return [...new Uint8Array(await blob.arrayBuffer())]
+  })
+  const notes = 'Notatki: zażółć gęślą jaźń\n'
+  await ala.page.locator('input[type=file]').setInputFiles([
+    { name: 'diagram.png', mimeType: 'image/png', buffer: Buffer.from(png) },
+    { name: 'notatki.txt', mimeType: 'text/plain', buffer: Buffer.from(notes) },
+  ])
+  const tray = ala.page.getByRole('list', { name: 'Files to send' })
+  await expect(tray.getByText('diagram.png')).toBeVisible()
+  await expect(tray.getByText('Preparing…')).toHaveCount(0)
+  await send(ala.page, 'Two files')
+
+  const sent = message(bob.page, 'Two files')
+  const image = sent.getByRole('button', { name: 'Open diagram.png' }).locator('img')
+  // The preview comes inside the message; the image itself then comes from Ala's device.
+  await expect(image).toHaveAttribute('src', /^blob:/, { timeout: 30_000 })
+
+  const download = bob.page.waitForEvent('download')
+  await sent.getByRole('button', { name: 'Save notatki.txt' }).click()
+  const saved = await download
+  expect(saved.suggestedFilename()).toBe('notatki.txt')
+  const path = await saved.path()
+  expect((await import('node:fs')).readFileSync(path, 'utf8')).toBe(notes)
+
+  await ala.context.close()
+  await bob.context.close()
+})
+
+test('a file nobody online has says so, and comes once its sender is back', async ({ browser }) => {
+  const ala = await signIn(browser, 'ala')
+  const bob = await signIn(browser, 'bob')
+  await createWorkspace(ala.page, 'Later', [bob.email])
+  await join(bob, await inviteLink(ala.page, 'Later'))
+  await linked(ala.page)
+  const channel = ala.page.url()
+  await ala.page.locator('input[type=file]').setInputFiles([{ name: 'raport.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 raport') }])
+  await expect(ala.page.getByRole('list', { name: 'Files to send' }).getByText('Preparing…')).toHaveCount(0)
+  await send(ala.page, 'The report')
+  await expect(message(bob.page, 'The report')).toBeVisible()
+  await ala.page.close()
+
+  const card = message(bob.page, 'The report')
+  await card.getByRole('button', { name: 'Save raport.pdf' }).click()
+  await expect(card.getByText('Nobody who has this file is online.')).toBeVisible({ timeout: 30_000 })
+
+  const back = await ala.context.newPage()
+  await back.goto(channel)
+  await linked(bob.page)
+  const download = bob.page.waitForEvent('download')
+  await card.getByRole('button', { name: 'Try raport.pdf again' }).click()
+  expect((await download).suggestedFilename()).toBe('raport.pdf')
+
+  await ala.context.close()
+  await bob.context.close()
+})

@@ -6,7 +6,9 @@ import { createPortal } from 'react-dom'
 import type { Account } from '../auth/session.ts'
 import type { Message } from '../content/derive.ts'
 import { useI18n } from '../i18nContext.ts'
+import type { WorkspaceFiles } from '../files/workspaceFiles.ts'
 import { Avatar } from '../ui/Avatar.tsx'
+import { MessageFiles } from './MessageFiles.tsx'
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👀', '🙏'] as const
 
@@ -14,7 +16,7 @@ const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👀', '🙏'] as co
 const copy = (text: string) => { void navigator.clipboard?.writeText(text).catch(() => {}) }
 
 /** One message: who and when on the first of a group, the text, reactions, and its actions on hover, focus or tap. */
-export const MessageItem = memo(function MessageItem({ message, first, account, author, names, replyTo, replyAuthor, onReply, onEdit, onDelete, onReact }: {
+export const MessageItem = memo(function MessageItem({ message, first, account, author, names, replyTo, replyAuthor, onReply, onEdit, onDelete, onReact, files }: {
   message: Message
   first: boolean
   account: Account
@@ -29,6 +31,8 @@ export const MessageItem = memo(function MessageItem({ message, first, account, 
   onEdit(message: Message): void
   onDelete(message: Message): void
   onReact(message: Message, emoji: string, on: boolean): void
+  /** The workspace's files, which the message's own are shown and saved from. */
+  files: WorkspaceFiles
 }) {
   const { t, locale } = useI18n()
   const { clockFormat } = useClockFormat()
@@ -79,13 +83,13 @@ export const MessageItem = memo(function MessageItem({ message, first, account, 
             <span className="sr-only">{t.inReplyTo}</span>
             {replyTo ? <>
               <span className="shrink-0 font-medium">{replyAuthor}</span>
-              <span className="truncate">{replyTo.deleted ? t.messageDeleted : replyTo.text}</span>
+              <span className="truncate">{replyTo.deleted ? t.messageDeleted : replyTo.text || replyTo.files[0]?.name}</span>
             </> : <span className="italic">{t.originalMessage}</span>}
           </p>
         )}
         {message.deleted ? (
           <p className="text-sm italic text-base-content/50">{t.messageDeleted}</p>
-        ) : (
+        ) : message.text && (
           <p className="whitespace-pre-wrap break-words leading-relaxed">
             {parts.map((part, index) => part.kind === 'link'
               ? <a key={index} href={part.href} target="_blank" rel="noopener noreferrer nofollow" className="link link-primary wrap-anywhere">{part.value}</a>
@@ -95,6 +99,7 @@ export const MessageItem = memo(function MessageItem({ message, first, account, 
             )}
           </p>
         )}
+        {!message.deleted && message.files.length > 0 && <MessageFiles files={files} refs={message.files} />}
         {message.reactions.length > 0 && (
           <ul className="mt-1 flex flex-wrap gap-1" aria-label={t.reactions}>
             {message.reactions.map(reaction => {
@@ -146,9 +151,9 @@ export const MessageItem = memo(function MessageItem({ message, first, account, 
             </div>
           ) : (
             <ul role="menu" className="menu w-52 p-0">
-              <li role="none"><button type="button" role="menuitem" onClick={() => { copy(message.text); menu.closePanel() }}>
+              {message.text && <li role="none"><button type="button" role="menuitem" onClick={() => { copy(message.text); menu.closePanel() }}>
                 <Copy className="size-4" aria-hidden="true" />{t.copyText}
-              </button></li>
+              </button></li>}
               {menu.firstUrl && <li role="none"><button type="button" role="menuitem" onClick={() => { copy(menu.firstUrl!); menu.closePanel() }}>
                 <Link2 className="size-4" aria-hidden="true" />{t.copyLink}
               </button></li>}

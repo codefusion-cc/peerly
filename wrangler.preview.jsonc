@@ -44,7 +44,13 @@
     { "name": "AUTH_IP_RATE_LIMITER", "namespace_id": "1004", "simple": { "limit": 60, "period": 60 } },
     // Error reports from pages, per connection.
     { "name": "BROWSER_FAILURE_RATE_LIMITER", "namespace_id": "1010", "simple": { "limit": 10, "period": 60 } },
+    // Cloud file uploads, per account.
+    { "name": "FILES_RATE_LIMITER", "namespace_id": "1012", "simple": { "limit": 30, "period": 60 } },
     { "name": "MEDIA_RATE_LIMITER", "namespace_id": "1008", "simple": { "limit": 6, "period": 60 } }
+  ],
+  // Premium workspaces' files, sealed on the page; a channel deletes them when its history ends.
+  "r2_buckets": [
+    { "binding": "FILES", "bucket_name": "peerly-files-preview" }
   ],
   "durable_objects": {
     "bindings": [

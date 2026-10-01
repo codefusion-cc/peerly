@@ -52,6 +52,10 @@ built on `@codefusion-cc/realtime`. This is the map; each module's comment has t
   ops per day and push what the other lacks, including other members' ops, so content spreads while anyone who
   has it is online.
 - **Storage**: one IndexedDB database per account on the device ([src/content/db.ts](../src/content/db.ts)).
+- **Files** ([src/files](../src/files)): a file is named by its SHA-256 and kept per workspace. A message carries
+  its reference (name, type, size, an image's small WebP preview). Showing one reads this device's copy, then
+  asks the members online over the mesh (which checks the bytes against the hash), then, for a Premium
+  workspace, the cloud. Files are only ever shown as images or saved, never opened in the app's origin.
 
 ## Premium
 

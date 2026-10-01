@@ -1,6 +1,6 @@
 import { groupConsecutiveMessages } from '@codefusion-cc/realtime/browser'
-import { ArrowDown, ArrowLeft, Hash, Info, Loader2 } from 'lucide-react'
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { ArrowDown, ArrowLeft, Hash, Info, Loader2, Upload } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { ConfirmDialog } from '../ui/ConfirmDialog.tsx'
 import type { Account } from '../auth/session.ts'
 import type { Channel, Message } from '../content/derive.ts'
@@ -24,6 +24,9 @@ export function ChannelView({ account, workspace, session, view, channel }: {
   const [unseen, setUnseen] = useState(0)
   const composer = useRef<ComposerHandle>(null)
   const [deleting, setDeleting] = useState<Message | null>(null)
+  // Files dragged over the channel: counted, since entering a child fires before leaving its parent.
+  const [dragging, setDragging] = useState(0)
+  const draggingFiles = (event: DragEvent) => event.dataTransfer.types.includes('Files')
   const lastCount = useRef(0)
   const restore = useRef<number | null>(null)
   const profiles = view.profiles
@@ -63,6 +66,16 @@ export function ChannelView({ account, workspace, session, view, channel }: {
     else setUnseen(count => count + added.length)
   }, [state.messages, account.userId, scrollToBottom])
 
+  // Content that grows after it was placed (an image arriving, a preview decoding) keeps a reader at the bottom there.
+  const thread = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const content = thread.current
+    if (!content) return
+    const observer = new ResizeObserver(() => { if (atBottom.current) scroller.current?.scrollTo({ top: scroller.current.scrollHeight }) })
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [])
+
   // Reaching the top reads older messages.
   useEffect(() => {
     const sentinel = top.current
@@ -86,7 +99,21 @@ export function ChannelView({ account, workspace, session, view, channel }: {
   const lastOwn = () => [...state.messages].reverse().find(message => message.by === account.userId && !message.deleted) ?? null
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-base-100" aria-labelledby="channel-title">
+    <section className="relative flex min-h-0 flex-1 flex-col bg-base-100" aria-labelledby="channel-title"
+      onDragEnter={event => { if (draggingFiles(event)) { event.preventDefault(); setDragging(count => count + 1) } }}
+      onDragOver={event => { if (draggingFiles(event)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy' } }}
+      onDragLeave={event => { if (draggingFiles(event)) setDragging(count => Math.max(0, count - 1)) }}
+      onDrop={event => {
+        if (!draggingFiles(event)) return
+        event.preventDefault()
+        setDragging(0)
+        composer.current?.attach([...event.dataTransfer.files])
+      }}>
+      {dragging > 0 && (
+        <div className="pointer-events-none absolute inset-2 z-30 grid place-items-center rounded-box border-2 border-dashed border-primary bg-base-100/90" aria-hidden="true">
+          <p className="flex items-center gap-2 font-medium text-primary"><Upload className="size-5" />{t.dropFiles}</p>
+        </div>
+      )}
       <header className="flex items-center gap-2 border-b border-base-300 px-3 py-2">
         <button type="button" className="btn btn-ghost btn-sm btn-square md:hidden" aria-label={t.back}
           onClick={() => navigate({ name: 'workspace', workspaceId: workspace.id })}>
@@ -98,7 +125,7 @@ export function ChannelView({ account, workspace, session, view, channel }: {
       </header>
 
       <div ref={scroller} onScroll={onScroll} className="scroll-quiet relative min-h-0 flex-1 overflow-y-auto" id="content" tabIndex={-1}>
-        <div className="mx-auto flex min-h-full max-w-(--container-thread) flex-col justify-end px-2 pb-2 pt-6 sm:px-4">
+        <div ref={thread} className="mx-auto flex min-h-full max-w-(--container-thread) flex-col justify-end px-2 pb-2 pt-6 sm:px-4">
           <div ref={top} aria-hidden="true" />
           {state.loading && <p className="flex justify-center py-3" role="status"><Loader2 className="size-5 animate-spin" aria-label={t.loading} /></p>}
           {!state.more && !state.loading && (
@@ -120,7 +147,7 @@ export function ChannelView({ account, workspace, session, view, channel }: {
                       author={names(message.by)} names={names}
                       replyTo={message.reply ? byId.get(message.reply) ?? null : null}
                       replyAuthor={message.reply ? names(byId.get(message.reply)?.by ?? '') : ''}
-                      onReply={onReply} onEdit={onEdit} onDelete={setDeleting} onReact={onReact} />
+                      onReply={onReply} onEdit={onEdit} onDelete={setDeleting} onReact={onReact} files={session.files} />
                   ))}
                 </Fragment>
               ))}
@@ -144,7 +171,10 @@ export function ChannelView({ account, workspace, session, view, channel }: {
         {typing.length ? t.typing(typing) : ''}
       </p>
       <Composer ref={composer} key={channel.id} channel={channel} lastOwn={lastOwn}
-        onSend={(text, replyTo) => session.send(channel.id, text, [], replyTo)}
+        onSend={async (text, replyTo, files, onProgress) => {
+          if (!files.length) { await session.send(channel.id, text, [], replyTo); return }
+          return session.sendWithFiles(channel.id, text, files, replyTo, onProgress)
+        }}
         onEdit={(message, text) => session.edit(message.id, text)}
         onTyping={() => session.typing(channel.id)} />
       <ConfirmDialog open={deleting !== null} onClose={() => setDeleting(null)} title={t.deleteMessage}

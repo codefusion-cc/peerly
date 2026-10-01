@@ -35,8 +35,10 @@ export const LIMITS = Object.freeze({
   messageText: 8_000,
   /** One file shared peer to peer or to the cloud. */
   fileBytes: 100 * 1024 * 1024,
-  /** What one premium account may keep in cloud files, across workspaces. */
-  cloudBytesPerAccount: 10 * 1024 * 1024 * 1024,
-  /** Files one account may upload a minute. */
-  uploadsPerMinute: 30,
+  /** A file as the cloud keeps it: sealed, with its IV and tag (SEALED_FILE_OVERHEAD). */
+  cloudFileBytes: 100 * 1024 * 1024 + 28,
+  /** What a premium owner's workspace may keep in cloud files. */
+  cloudBytesPerWorkspace: 5 * 1024 * 1024 * 1024,
+  /** Files attached to one message. */
+  filesPerMessage: 10,
 })
