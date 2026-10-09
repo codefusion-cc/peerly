@@ -28,7 +28,7 @@ Only `console` (dev tool, run as `codefusion-console cloudflare <scopes> -- <com
 
 ## Tests and checks
 
-- Typecheck `npm run typecheck`; lint `npm run lint` (oxlint); build `npm run build` (also bundle and size guards).
+- Typecheck `npm run typecheck`; lint `npm run lint` (oxlint); build `npm run build` (also bundle, size and `guard:preview` guards: link-preview tags, `og-v1.jpg` and `robots.txt` in `dist/`; a new preview image gets a new file name).
 - Unit (jsdom, `src/`, `packages/core/src`, `worker/**/*.test.mjs`): `npm test -- --maxWorkers=2`. Worker (workerd, `*.workers.test.*` in `packages/core/worker/realtime`): `npm run test:workers`; `npm run worker:check` after changing a wrangler config.
 - E2E (Playwright): `npm run test:e2e` (local relay), `npm run test:e2e:do` (built app behind the real Worker and DOs), `npm run test:a11y`. `test:mutation` (incremental) is a CI gate the deploy waits for; the weekly full re-test is in `security.yml`.
 - CI (`.github/workflows/ci.yml`) also runs audit, coverage, `check:csp` and mutation testing (the deploy needs it).

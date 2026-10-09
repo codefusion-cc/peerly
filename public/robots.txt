@@ -1,0 +1,12 @@
+User-agent: *
+Disallow: /api/
+Disallow: /login
+Disallow: /home
+Disallow: /friends
+Disallow: /profile
+Disallow: /storage
+Disallow: /create
+Disallow: /join
+Disallow: /devices
+Disallow: /sync
+Disallow: /workspace
