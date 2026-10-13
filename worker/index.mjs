@@ -11,6 +11,7 @@ export { SignalScopeDO } from '../packages/core/worker/realtime/index.mjs'
 export { UserGatewayDO } from './realtime/gateway.mjs'
 export { ContentChannelDO }
 export { LobbyChannelDO }
+export { ConsoleAdmin } from './console/consoleAdmin.mjs'
 
 const NETWORK_CREDENTIALS_PATH = '/api/network/credentials'
 const RENDEZVOUS_LOOKUP_PATH = '/api/rendezvous/lookup'

@@ -9,7 +9,7 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ['packages/core/worker/realtime/**/*.workers.test.{mjs,ts}'],
+    include: ['packages/core/worker/realtime/**/*.workers.test.{mjs,ts}', 'worker/**/*.workers.test.mjs'],
     // The plugin isolates storage per file; tests also use distinct object names.
   },
 })

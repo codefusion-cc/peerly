@@ -98,5 +98,8 @@
       "OPAQUE_USER_ID_SECRET"
     ]
   },
-  "observability": { "enabled": true, "head_sampling_rate": 1 }
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // CodeFusion Console (codefusion-cc/codefusion-console) reads every
+  // invocation for its Failures, Health and Logs pages.
+  "tail_consumers": [{ "service": "codefusion-console" }]
 }

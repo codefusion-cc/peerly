@@ -9,7 +9,7 @@ Per-screen behavior is in [views.md](views.md); several tabs of one browser in [
 - `src/collab/` app policy: workspace stores, creator-signed allow-lists (`allowList.ts`), message signing, identity providers, DM and friends stores, mesh (`mesh.ts`), sibling tabs and once-per-browser attention (`browserTabs.ts`).
 - `src/components/` UI (join, workspace, chat, files, `VideoCall.tsx`), `src/hooks/` room, collab and auth wiring (`useCollab.ts`, `useRoom.ts`), `src/context/` collab context, `src/protocol/` message types and mappers, `src/realtime/content.ts` DO content client.
 - `packages/core/` published `@peerly/core`: generic rooms, signaling, device identity, per-tab session keys (`tabSession.ts`), peer handshake (`peerIdentityHandshake.ts`), OIDC checks, media, `worker/` (Google auth, rendezvous, `realtime/` DO runtime), `server/` (relay). The app imports it from source through an alias.
-- `worker/index.mjs` production Worker (API routes, assets); `worker/realtime/` Peerly's DO classes (`gateway.mjs`, `lobbyChannel.mjs`, `contentChannel.mjs`, `commands/`); `worker/usageWatch.mjs` with `wrangler.usage-watch.jsonc`.
+- `worker/index.mjs` production Worker (API routes, assets); `worker/console/` the `ConsoleAdmin` entrypoint CodeFusion Console binds, and its manifest of Worker secrets; `worker/realtime/` Peerly's DO classes (`gateway.mjs`, `lobbyChannel.mjs`, `contentChannel.mjs`, `commands/`); `worker/usageWatch.mjs` with `wrangler.usage-watch.jsonc`.
 - `server/` dev and test servers and the production relay (`relay.mjs`, `relay-prod.mjs`). `infra/` coturn, nginx, systemd, firewall for the VPS.
 - `e2e/` Playwright specs, `scripts/` bundle and CSP guards, relay checks, version bump. `docs/` implementation notes.
 - Configs: `wrangler.jsonc` (production), `wrangler.preview.jsonc` (staging with DOs; the only config with DO migrations), `wrangler.e2e.jsonc`, `vitest.config.ts`, `vitest.workers.config.ts`, `playwright*.config.ts`.
@@ -24,12 +24,12 @@ Per-screen behavior is in [views.md](views.md); several tabs of one browser in [
 
 ## @codefusion-cc packages
 
-Only `console` (dev tool, run as `codefusion-console cloudflare <scopes> -- <command>` for Cloudflare commands). Shared product code is `@peerly/core` in `packages/core`.
+Only `console`: the Worker's `ConsoleAdmin` (`worker/console/`), `/version.json` and the build identity (`build-info.mjs`, `vite.config.ts`), and the CLI (`codefusion-console cloudflare <scopes> -- <command>` for Cloudflare commands, `codefusion-console secrets peerly` for the Worker secrets). Both Workers' invocations go to the console as their tail consumer. Shared product code is `@peerly/core` in `packages/core`.
 
 ## Tests and checks
 
 - Typecheck `npm run typecheck`; lint `npm run lint` (oxlint); build `npm run build` (also bundle, size and `guard:preview` guards: link-preview tags, `og-v1.jpg` and `robots.txt` in `dist/`; a new preview image gets a new file name).
-- Unit (jsdom, `src/`, `packages/core/src`, `worker/**/*.test.mjs`): `npm test -- --maxWorkers=2`. Worker (workerd, `*.workers.test.*` in `packages/core/worker/realtime`): `npm run test:workers`; `npm run worker:check` after changing a wrangler config.
+- Unit (jsdom, `src/`, `packages/core/src`, `worker/**/*.test.mjs`): `npm test -- --maxWorkers=2`. Worker (workerd, `*.workers.test.*` in `packages/core/worker/realtime` and `worker/`): `npm run test:workers`; `npm run worker:check` after changing a wrangler config.
 - E2E (Playwright): `npm run test:e2e` (local relay), `npm run test:e2e:do` (built app behind the real Worker and DOs), `npm run test:a11y`. `test:mutation` (incremental) is a CI gate the deploy waits for; the weekly full re-test is in `security.yml`.
 - CI (`.github/workflows/ci.yml`) also runs audit, coverage, `check:csp` and mutation testing (the deploy needs it).
 
