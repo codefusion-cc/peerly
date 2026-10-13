@@ -67,7 +67,7 @@
   },
   "dependencies": {
     "@codefusion-cc/console": "^0.32.0",
-    "@codefusion-cc/realtime-media": "^0.1.4",
+    "@codefusion-cc/realtime-media": "^0.1.5",
     "@tensorflow/tfjs": "^4.22.0",
     "@trystero-p2p/core": "^0.25.3",
     "@trystero-p2p/nostr": "^0.25.3",
