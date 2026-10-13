@@ -739,6 +739,25 @@ export type UseRoomOptions = {
 }
 
 /**
+ * The teardown under way for each room, across every component that joins it:
+ * Trystero hands a join of a room it has not let go of yet that same room,
+ * which the teardown then leaves. A component that replaces another (a
+ * remount) must wait for the old one's teardown as much as a rejoin must.
+ */
+const roomTeardowns = new Map<string, Promise<void>>()
+
+/**
+ * Waits until no teardown of the room is under way. Stops as soon as the
+ * waiting join is cancelled, since its own teardown is then the one under way.
+ */
+async function awaitRoomTeardown(key: string, cancelled: () => boolean): Promise<void> {
+  for (let pending = roomTeardowns.get(key); pending && !cancelled(); pending = roomTeardowns.get(key)) {
+    await pending
+    if (roomTeardowns.get(key) === pending) roomTeardowns.delete(key)
+  }
+}
+
+/**
  * Join a room for the lifetime of the component. Handles the teardown/rejoin
  * race: `leave()` is async, and the Nostr strategy shares batched relay
  * subscriptions across rooms — a leave that lands *after* the next join has
@@ -762,8 +781,6 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
   const roomScope = useMemo(() => ({ appId, roomId, password, strategy }), [appId, roomId, password, strategy])
   const [room, setRoom] = useConversationState<Room | null>(roomScope, () => null)
   const instanceRef = useRef<Room | null>(null)
-  /** Resolves when the previous room has fully left; see setup() below. */
-  const teardownRef = useRef<Promise<void>>(Promise.resolve())
   const onErrorRef = useRef(onError)
   onErrorRef.current = onError
   const errorTextRef = useRef(errorText)
@@ -807,6 +824,7 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
     }
 
     let cancelled = false
+    const teardownKey = `${strategy}\n${appId}\n${roomId}`
 
     const scheduleRecovery = (remotePeerId?: string) => {
       const recovery = recoveryRef.current
@@ -841,7 +859,7 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
 
     const setup = async () => {
       // Wait for any previous room to finish leaving before joining again.
-      await teardownRef.current
+      await awaitRoomTeardown(teardownKey, () => cancelled)
       if (cancelled) return
 
       const joined = await joinRoomByCode({
@@ -922,13 +940,15 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
       const active = instanceRef.current
       instanceRef.current = null
       // Record the teardown so the next join can await it rather than race it.
-      // A join still under way leaves its room itself once it lands; the next
-      // join must wait for that too, because Trystero hands a second join of
-      // the same room id the room it has not let go of yet, which this
-      // teardown is about to leave.
-      teardownRef.current = active
+      // A join still under way leaves its room itself once it lands, so the
+      // next join waits for that join instead.
+      const teardown = active
         ? Promise.resolve(active.leave()).catch(() => {})
         : joining.catch(() => {})
+      roomTeardowns.set(teardownKey, teardown)
+      void teardown.then(() => {
+        if (roomTeardowns.get(teardownKey) === teardown) roomTeardowns.delete(teardownKey)
+      })
       setRoom(null)
     }
   }, [appId, roomId, password, strategy, onPeerHandshake, handshakeTimeoutMs, recoverIceFailures, rejoinNonce, setRoom])

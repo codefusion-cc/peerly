@@ -32,7 +32,7 @@ const signaling = vi.hoisted(() => {
             getPeers: () => ({}),
             // Leaving takes a moment: Trystero tells the room before it lets go.
             leave: async () => {
-              await new Promise(resolve => setTimeout(resolve, 20))
+              await new Promise(resolve => setTimeout(resolve, 200))
               room.left = true
               if (occupied.get(roomId) === room) occupied.delete(roomId)
             },
@@ -89,11 +89,51 @@ describe('useRoom', () => {
 
     await waitFor(() => expect(result.current.room).not.toBeNull())
     // Every leave under way has finished by now.
-    await act(() => new Promise(resolve => setTimeout(resolve, 100)))
+    await act(() => new Promise(resolve => setTimeout(resolve, 400)))
     const room = result.current.room as unknown as { id: number; left: boolean }
     expect(room.left).toBe(false)
     expect(signaling.rooms.map(r => r.left)).toEqual([true, false])
     expect(room.id).toBe(2)
+  })
+
+  it('joins once more after two quick changes while its room was still leaving', async () => {
+    const { result, rerender } = renderHook(
+      ({ onPeerHandshake }) => useRoom({ appId: 'peerly', roomId: 'workspace', env: ENV, onPeerHandshake }),
+      { initialProps: { onPeerHandshake: handshake() } },
+    )
+    await joinsAsked(1)
+    await settleNextJoin()
+    await waitFor(() => expect(result.current.room).not.toBeNull())
+
+    rerender({ onPeerHandshake: handshake() })
+    rerender({ onPeerHandshake: handshake() })
+    await joinsAsked(2)
+    await settleNextJoin()
+
+    await waitFor(() => expect(result.current.room).not.toBeNull())
+    await act(() => new Promise(resolve => setTimeout(resolve, 400)))
+    expect(signaling.asked).toBe(2)
+    expect(signaling.rooms.map(r => r.left)).toEqual([true, false])
+  })
+
+  it('ends on a live room when the component is replaced by a new one while its room is still leaving', async () => {
+    const first = renderHook(() => useRoom({ appId: 'peerly', roomId: 'workspace', env: ENV }))
+    await joinsAsked(1)
+    await settleNextJoin()
+    await waitFor(() => expect(first.result.current.room).not.toBeNull())
+
+    // A remount: the old component goes, a new one joins the same room at once.
+    first.unmount()
+    const second = renderHook(() => useRoom({ appId: 'peerly', roomId: 'workspace', env: ENV }))
+    await joinsAsked(2)
+    await settleNextJoin()
+
+    await waitFor(() => expect(second.result.current.room).not.toBeNull())
+    await act(() => new Promise(resolve => setTimeout(resolve, 400)))
+    const room = second.result.current.room as unknown as { id: number; left: boolean }
+    expect(room.left).toBe(false)
+    expect(room.id).toBe(2)
+    second.unmount()
   })
 
   it('leaves the room it joined when it unmounts mid-join, and joins nothing else', async () => {
