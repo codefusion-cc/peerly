@@ -37,6 +37,16 @@ const jitter = (ms: number) => Math.round(ms * (0.5 + Math.random() / 2))
  * limit, a refused frame) must keep backing off, not return every second.
  */
 const STABLE_MS = 30_000
+/**
+ * What a room sends while its socket is opening or reopening waits for it, up
+ * to this many messages and this long. Trystero announces a room the moment it
+ * joins, before its socket can be open; losing that announcement leaves the
+ * room unseen until the next one, and a room left and joined again in that
+ * window cuts its first peer connections off half made. Anything older than
+ * the wait is stale: Trystero announces again every few seconds.
+ */
+const PENDING_LIMIT = 32
+const PENDING_MAX_AGE_MS = 5_000
 
 type ScopeConfig = DurableObjectsRoomConfig['durableObjects']
 
@@ -52,6 +62,7 @@ class ScopeSocket {
   private attempts = 0
   private retry: ReturnType<typeof setTimeout> | undefined
   private stable: ReturnType<typeof setTimeout> | undefined
+  private pending: Array<{ topic: string; message: StrategyMessage; at: number }> = []
 
   constructor(config: ScopeConfig) {
     this.config = config
@@ -113,6 +124,12 @@ class ScopeSocket {
       this.reconnect()
     })
     if (this.handlers.size > 0) this.claimTopics()
+    const fresh = Date.now() - PENDING_MAX_AGE_MS
+    const pending = this.pending
+    this.pending = []
+    for (const { topic, message, at } of pending) {
+      if (at >= fresh) this.send(topic, message)
+    }
   }
 
   private reconnect(): void {
@@ -137,7 +154,11 @@ class ScopeSocket {
   }
 
   send(topic: string, message: StrategyMessage): void {
-    if (this.socket?.readyState !== WebSocket.OPEN) return
+    if (this.socket?.readyState !== WebSocket.OPEN) {
+      this.pending.push({ topic, message, at: Date.now() })
+      if (this.pending.length > PENDING_LIMIT) this.pending.shift()
+      return
+    }
     this.socket.send(encodeFrame('signal', { id: ids.next(), payload: { topic, message } }))
   }
 

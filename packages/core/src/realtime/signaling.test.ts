@@ -137,6 +137,34 @@ describe('Durable Objects signaling authorization', () => {
   })
 })
 
+describe('a room joining', () => {
+  it('announces itself as soon as its socket opens, after claiming its topics, though it spoke before', async () => {
+    const room = enter(config, 'room-1')
+    room.send('room-1/root', 'announce')
+    await vi.waitFor(() => expect(sockets).toHaveLength(1))
+    expect(sockets[0].sent).toEqual([])
+    sockets[0].accept()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sockets[0].sent.map(frame => frame.payload)).toEqual([
+      { subscribe: ['room-1/self', 'room-1/root'] },
+      { topic: 'room-1/root', message: 'announce' },
+    ])
+  })
+
+  it('says nothing it held once left, and a rejoin starts with nothing held', async () => {
+    const room = enter(config, 'room-1')
+    room.send('room-1/root', 'announce of the left room')
+    await vi.waitFor(() => expect(sockets).toHaveLength(1))
+    room.leave()
+    sockets[0].accept()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sockets[0].sent).toEqual([])
+
+    await join(config, 'room-1')
+    expect(latest().sent.map(frame => frame.payload)).toEqual([{ subscribe: ['room-1/self', 'room-1/root'] }])
+  })
+})
+
 describe('rooms open at the same time', () => {
   it('signal each through its own scope, not the scope of the room that opened first', async () => {
     transport.requestScope.mockImplementation(async (_kind: string, capability: string) => ({ routeId: `route-of-${capability.slice(0, 8)}` }))
@@ -246,12 +274,42 @@ describe('a room whose scope restarts', () => {
     expect(latest().sent.at(-1)?.payload).toEqual({ topic: 'room-1/root', message: 'announce' })
   })
 
-  it('drops what the room sends while the scope is away, without throwing', async () => {
-    const room = await join()
-    const sent = sockets[0].sent.length
+  it('sends what the room said while the scope was away once it is back, if said within the last 5 seconds', async () => {
+    let reachable = () => {}
+    const room = await join(routedConfig)
+    transport.connect.mockReturnValue(new Promise<void>(resolve => { reachable = resolve }))
     sockets[0].drop()
-    expect(() => room.send('room-1/root', 'announce')).not.toThrow()
-    expect(sockets[0].sent).toHaveLength(sent)
+    expect(() => room.send('room-1/root', 'stale announce')).not.toThrow()
+    await vi.advanceTimersByTimeAsync(1_000)
+    room.send('room-1/self-of-peer', 'answer')
+    await vi.advanceTimersByTimeAsync(4_000)
+    room.send('room-1/root', 'fresh announce')
+    expect(sockets[0].sent.map(frame => frame.payload)).not.toContainEqual(expect.objectContaining({ message: 'answer' }))
+
+    reachable()
+    await vi.waitFor(() => expect(sockets).toHaveLength(2))
+    latest().accept()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(latest().sent.map(frame => frame.payload)).toEqual([
+      { subscribe: ['room-1/self', 'room-1/root'] },
+      { topic: 'room-1/self-of-peer', message: 'answer' },
+      { topic: 'room-1/root', message: 'fresh announce' },
+    ])
+  })
+
+  it('keeps only the last 32 messages said while the scope was away, in order', async () => {
+    let reachable = () => {}
+    const room = await join(routedConfig)
+    transport.connect.mockReturnValue(new Promise<void>(resolve => { reachable = resolve }))
+    sockets[0].drop()
+    for (let n = 1; n <= 40; n++) room.send('room-1/root', `announce ${n}`)
+    reachable()
+    await vi.advanceTimersByTimeAsync(1_000)
+    await vi.waitFor(() => expect(sockets).toHaveLength(2))
+    latest().accept()
+    await vi.advanceTimersByTimeAsync(0)
+    const said = latest().sent.flatMap(frame => 'message' in (frame.payload as object) ? [(frame.payload as { message: string }).message] : [])
+    expect(said).toEqual(Array.from({ length: 32 }, (_, i) => `announce ${i + 9}`))
   })
 
   it('backs off while the control plane cannot be reached, then recovers and starts over from a second', async () => {
