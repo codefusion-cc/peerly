@@ -1,47 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
 import worker, { allowedAuthParent } from './index.mjs'
 import { resolveContentBackend } from '../src/config.ts'
+import { readWranglerConfig } from './testing/wranglerConfig.mjs'
 
-// wrangler.preview.jsonc allows `//` line comments; strip them before
-// JSON.parse. Scans char-by-char tracking string/escape state so a `//`
-// inside a quoted value (e.g. a URL) is never mistaken for a comment — a
-// regex-based line-suffix strip can't make that distinction reliably.
-function parseJsonc(text) {
-  let out = ''
-  let inString = false
-  let escaped = false
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i]
-    const next = text[i + 1]
-    if (inString) {
-      out += char
-      if (escaped) escaped = false
-      else if (char === '\\') escaped = true
-      else if (char === '"') inString = false
-      continue
-    }
-    if (char === '"') {
-      inString = true
-      out += char
-      continue
-    }
-    if (char === '/' && next === '/') {
-      while (i < text.length && text[i] !== '\n') i += 1
-      out += '\n'
-      continue
-    }
-    out += char
-  }
-  return JSON.parse(out)
-}
-
-const previewConfig = parseJsonc(
-  readFileSync(new URL('../wrangler.preview.jsonc', import.meta.url), 'utf8')
-)
-const productionConfig = parseJsonc(
-  readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
-)
+const previewConfig = readWranglerConfig('wrangler.preview.jsonc')
+const productionConfig = readWranglerConfig('wrangler.jsonc')
 
 describe('deployment content profiles', () => {
   it('keeps a default frontend build compatible with the production Worker', async () => {
