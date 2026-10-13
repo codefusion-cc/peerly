@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { canonicalizePublicKey } from './deviceIdentity'
 import {

@@ -1,5 +1,5 @@
 import { requireAppId, type Env } from './env.js'
-import { getTurnConfig, resolveIceServers, type TurnServer } from './relays.js'
+import { hasTurn, type IceServer } from './realtime/ice.js'
 import { resolveSignalingStrategy } from './signaling.js'
 
 export type TurnCapability = {
@@ -11,20 +11,15 @@ export type TurnCapability = {
 const TURN_PROBE_TIMEOUT_MS = 12_000
 
 /**
- * Resolve the TURN credentials the probe should test, from whichever backend
- * this build actually uses. On `durable-objects` the credentials ride the
- * authenticated control session (`/api/network/session`); the legacy
- * `/api/network/credentials` relay-ticket endpoint does not exist in that
- * deployment, so probing it there is a guaranteed 503. Every other strategy
- * keeps using that legacy endpoint. The realtime runtime is imported lazily so
- * nostr/ws-relay/supabase-only consumers don't bundle the control client.
+ * The ICE servers the control session handed this tab, or undefined when it
+ * has not answered. Only the Durable Objects strategy has TURN; the dev
+ * strategies have none to test. The realtime runtime is imported lazily so
+ * nostr/supabase-only consumers don't bundle the control client.
  */
-export async function resolveProbeIceServers(env: Env): Promise<TurnServer[] | undefined> {
-  if (resolveSignalingStrategy(env) === 'durable-objects') {
-    const { getDurableObjectsIceServers } = await import('./realtime/runtime.js')
-    return getDurableObjectsIceServers(requireAppId(env))
-  }
-  return resolveIceServers(env)
+export async function resolveProbeIceServers(env: Env): Promise<IceServer[] | undefined> {
+  if (resolveSignalingStrategy(env) !== 'durable-objects') return []
+  const { getDurableObjectsIceServers } = await import('./realtime/runtime.js')
+  return getDurableObjectsIceServers(requireAppId(env))
 }
 
 /**
@@ -35,11 +30,8 @@ export async function resolveProbeIceServers(env: Env): Promise<TurnServer[] | u
 export async function probeTurnCapability(
   env: Env,
   timeoutMs: number = TURN_PROBE_TIMEOUT_MS,
-  resolveCredentials: (env: Env) => Promise<TurnServer[] | undefined> = resolveProbeIceServers
+  resolveCredentials: (env: Env) => Promise<IceServer[] | undefined> = resolveProbeIceServers
 ): Promise<TurnCapability> {
-  if (!getTurnConfig(env)) {
-    return { status: 'not-configured', detail: 'TURN is not configured.', transports: [] }
-  }
   if (typeof RTCPeerConnection === 'undefined') {
     return { status: 'unavailable', detail: 'This browser does not expose WebRTC peer connections.', transports: [] }
   }
@@ -48,7 +40,12 @@ export async function probeTurnCapability(
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     const iceServers = await resolveCredentials(env)
-    if (!iceServers?.length) throw new Error('TURN credentials are unavailable. Sign in again and retry.')
+    if (!iceServers) throw new Error('TURN credentials are unavailable. Sign in again and retry.')
+    // The deployment decides: without a TURN key the session hands out STUN
+    // alone, and there is nothing to allocate.
+    if (!hasTurn(iceServers)) {
+      return { status: 'not-configured', detail: 'TURN is not configured.', transports: [] }
+    }
     connection = new RTCPeerConnection({ iceServers, iceTransportPolicy: 'relay' })
     connection.createDataChannel('peerly-turn-check')
     const transports = new Set<string>()

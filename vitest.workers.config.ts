@@ -4,8 +4,9 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [
     cloudflareTest({
-      // Only preview has Durable Object bindings. Production stays migration-free.
-      wrangler: { configPath: './wrangler.preview.jsonc' },
+      // Production's config: the bindings and migrations that matter. Preview
+      // has the same Durable Objects.
+      wrangler: { configPath: './wrangler.jsonc' },
     }),
   ],
   test: {

@@ -1,11 +1,12 @@
+import { checkMediaHealth, handleMediaHealth, MEDIA_HEALTH_PATH, turnConfigured } from '@codefusion-cc/realtime-media'
 import { handleGoogleAuthRoute } from '../packages/core/worker/googleAuth.mjs'
-import { issueNetworkCredentials } from '../packages/core/worker/networkCredentials.mjs'
 import { lookupRendezvous } from '../packages/core/worker/rendezvous.mjs'
 import { issueLobbyIdentity, verifyLobbyIdentity } from '../packages/core/worker/lobbyIdentity.mjs'
 import { handleRealtimeRoute } from '../packages/core/worker/realtime/index.mjs'
 import { prepareAuthenticatedRealtimeUpgrade } from '../packages/core/worker/realtime/index.mjs'
 import { ContentChannelDO } from './realtime/contentChannel.mjs'
 import { LobbyChannelDO } from './realtime/lobbyChannel.mjs'
+import { issueIceServers } from './realtime/ice.mjs'
 
 export { SignalScopeDO } from '../packages/core/worker/realtime/index.mjs'
 export { UserGatewayDO } from './realtime/gateway.mjs'
@@ -13,7 +14,6 @@ export { ContentChannelDO }
 export { LobbyChannelDO }
 export { ConsoleAdmin } from './console/consoleAdmin.mjs'
 
-const NETWORK_CREDENTIALS_PATH = '/api/network/credentials'
 const RENDEZVOUS_LOOKUP_PATH = '/api/rendezvous/lookup'
 const CONTENT_CHANNEL_PREFIX = '/api/realtime/content/'
 const LOBBY_CHANNEL_PREFIX = '/api/realtime/lobby/'
@@ -60,28 +60,20 @@ function originAllowedBy(env) {
 export default {
   async fetch(request, env, context) {
     const url = new URL(request.url)
-    if (url.pathname === NETWORK_CREDENTIALS_PATH) return issueNetworkCredentials(request, env)
+    if (url.pathname === MEDIA_HEALTH_PATH) return handleMediaHealth(request, env)
     if (url.pathname === RENDEZVOUS_LOOKUP_PATH) return lookupRendezvous(request, env)
     if (url.pathname === '/api/rendezvous/presence') return issueLobbyIdentity(request, env)
     if (url.pathname === '/api/rendezvous/verify') return verifyLobbyIdentity(request, env)
     const realtimeConfig = {
       app: 'peerly',
       allowedOrigin: originAllowedBy(env),
-      requirePublicUserId:
-        env.CONTENT_BACKEND === 'durable-objects' ||
-        env.COORDINATION_BACKEND === 'durable-objects',
+      requirePublicUserId: true,
       requirePrivateMemberId: env.CONTENT_BACKEND === 'durable-objects',
+      iceServers: issueIceServers,
     }
     if (url.pathname.startsWith(LOBBY_CHANNEL_PREFIX)) {
-      if (
-        env.COORDINATION_BACKEND !== 'durable-objects' ||
-        !env.LOBBY_CHANNELS ||
-        url.pathname.slice(LOBBY_CHANNEL_PREFIX.length) !== LOBBY_ROUTE_ID
-      ) {
-        return Response.json(
-          { code: 'service-unavailable' },
-          { status: 503 }
-        )
+      if (url.pathname.slice(LOBBY_CHANNEL_PREFIX.length) !== LOBBY_ROUTE_ID) {
+        return new Response('Not found', { status: 404 })
       }
       const prepared = await prepareAuthenticatedRealtimeUpgrade(
         request,
@@ -94,11 +86,7 @@ export default {
         .fetch(prepared.request)
     }
     if (url.pathname.startsWith(CONTENT_CHANNEL_PREFIX)) {
-      if (
-        env.COORDINATION_BACKEND !== 'durable-objects' ||
-        env.CONTENT_BACKEND !== 'durable-objects' ||
-        !env.CONTENT_CHANNELS
-      ) {
+      if (env.CONTENT_BACKEND !== 'durable-objects' || !env.CONTENT_CHANNELS) {
         return Response.json(
           { code: 'service-unavailable' },
           { status: 503 }
@@ -122,5 +110,18 @@ export default {
     if (realtimeResponse) return realtimeResponse
     const authResponse = await handleGoogleAuthRoute(request, env, context, authConfig)
     return authResponse ?? env.ASSETS.fetch(request)
+  },
+
+  /**
+   * Every five minutes (wrangler `triggers`): asks Cloudflare for TURN
+   * credentials as a session would, and logs an error line, which the console
+   * turns into a failure, when it fails twice or when no TURN key is set.
+   */
+  async scheduled(_controller, env) {
+    if (!turnConfigured(env)) {
+      console.error('media health: no TURN key (TURN_KEY_ID, TURN_KEY_API_TOKEN); calls between strict networks cannot connect')
+      return
+    }
+    await checkMediaHealth(env)
   },
 }

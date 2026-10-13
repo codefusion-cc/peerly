@@ -4,7 +4,7 @@ import {
   joinWorkspace,
   sendMessage,
   waitForPeerConnection,
-  waitForRelay,
+  waitForSignaling,
   waitForWorkspace,
 } from './helpers'
 
@@ -22,7 +22,7 @@ async function aliceInTwoTabs(browser: Browser) {
   const context = await browser.newContext()
   const first = await context.newPage()
   await joinWorkspace(first, { name: 'Alice', email: 'alice@e2e.test' })
-  await waitForRelay(first)
+  await waitForSignaling(first)
   const second = await openAnotherTab(context, first)
   await waitForPeerConnection(first)
   await waitForPeerConnection(second)

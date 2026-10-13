@@ -2,12 +2,9 @@ import { createProcessRunner } from './spawn-utils.mjs'
 
 const { run } = createProcessRunner()
 
-// Dev uses the same public Nostr signaling a deployed build uses. There is no
-// local relay process: a dev setup that only works against a relay we run
-// ourselves hides real signaling problems until production.
-//
-// To use a local relay instead (offline work, or to stay off public relays):
-//   npm run dev:relay
+// The Vite dev server has no Worker, so no Durable Objects to signal through:
+// dev uses public Nostr relays. The Worker's own path, signaling and TURN
+// included, runs in `npm run test:e2e` (server/test-server.mjs).
 console.log('\nStarting Peerly — signaling: public Nostr relays\n')
 
 run('vite', 'npx', ['vite', '--host'], {

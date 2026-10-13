@@ -124,17 +124,12 @@ jobs:
       # As in `test`; without the token, so no dependency ever sees it.
       - run: npm ci --ignore-scripts
 
-      # Workers Builds' build variables for production (public values: the
-      # Google client, the relay and TURN hosts), as the bundle on peerly.cc
-      # was built with them.
+      # The one public build value production needs. Signaling and TURN come
+      # from the Worker at runtime, so nothing about them is baked in.
       - name: Build
         run: npm run build
         env:
           VITE_GOOGLE_CLIENT_ID: 724645084534-eb9led5upjj8p46dr890tg3a0k3sonsk.apps.googleusercontent.com
-          VITE_SIGNALING: ws-relay
-          VITE_RELAY_HOST: relay.peerly.cc
-          VITE_RELAY_PORT: '443'
-          VITE_TURN_URLS: turn:turn.peerly.cc:3478,turns:turn.peerly.cc:5349
 
       - name: Deploy the Worker
         env:
@@ -165,3 +160,9 @@ jobs:
           done
           echo "::error::peerly.cc does not serve $entry a minute after the deploy"
           exit 1
+
+      # HSTS, and the deployed Worker getting Cloudflare TURN credentials with
+      # the provisioned key. A revoked key fails here and in the five-minute
+      # media health cron, not in someone's call.
+      - name: peerly.cc gets Cloudflare TURN
+        run: npm run verify:production

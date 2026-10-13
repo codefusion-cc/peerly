@@ -94,8 +94,8 @@ export function createBrowserSessionApi(options: BrowserSessionOptions): Session
       // failed is worth retrying with the same one.
       if (response.status === 401) return { kind: 'rejected' }
       if (!response.ok) return { kind: 'failed', ...retryAfterMs(response) }
-      const body = await response.json() as { turn?: unknown }
-      return { kind: 'established', turn: body.turn }
+      const body = await response.json() as { ice?: unknown }
+      return { kind: 'established', ice: body.ice }
     },
   }
 }

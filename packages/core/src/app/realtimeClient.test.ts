@@ -89,7 +89,7 @@ describe('RealtimeClient', () => {
   let clock: ReturnType<typeof fakeTimers>
 
   const enrolled: EnrollResult = { kind: 'capability', capability: 'cap-1' }
-  const established: SessionResult = { kind: 'established', turn: { urls: ['turn:x'] } }
+  const established: SessionResult = { kind: 'established', ice: { servers: [{ urls: ['turn:x'] }] } }
 
   const build = () => new RealtimeClient({
     api,
@@ -155,19 +155,35 @@ describe('RealtimeClient', () => {
   })
 
   describe('session refresh', () => {
-    it('re-establishes on a live socket and re-announces TURN', async () => {
-      // Both the session cookie and the TURN credential expire on a wall
+    it('re-establishes on a live socket and hands out the renewed ICE servers', async () => {
+      // Both the session cookie and the TURN credentials expire on a wall
       // clock. Without this a tab connected past the TTL could no longer open
       // a signalling socket and offered peers expired credentials.
+      const renewed = { servers: [{ urls: ['turn:renewed'] }] }
+      api.establish.mockResolvedValueOnce(established).mockResolvedValueOnce({ kind: 'established', ice: renewed })
       const client = build()
-      const turns: unknown[] = []
-      client.addEventListener('turn', event => turns.push((event as CustomEvent).detail))
+      const grants: unknown[] = []
+      client.addEventListener('ice', event => grants.push((event as CustomEvent).detail))
       await connect(client)
-      expect(turns).toHaveLength(1)
+      expect(grants).toEqual([{ servers: [{ urls: ['turn:x'] }] }])
 
       clock.fireIntervals()
-      await vi.waitFor(() => expect(turns).toHaveLength(2))
+      await vi.waitFor(() => expect(grants).toHaveLength(2))
+      expect(grants[1]).toBe(renewed)
       expect(api.establish).toHaveBeenCalledTimes(2)
+    })
+
+    it('hands out the ICE servers even when the socket then fails to open', async () => {
+      // A call can start on them while the socket retries.
+      const client = build()
+      const grants: unknown[] = []
+      client.addEventListener('ice', event => grants.push((event as CustomEvent).detail))
+      const connecting = client.connect()
+      await vi.waitFor(() => expect(channels.connected).toBe(true))
+      channels.drop()
+      await connecting
+      expect(client.currentState).not.toBe('ready')
+      expect(grants).toHaveLength(1)
     })
 
     it('keeps the socket when a refresh fails', async () => {

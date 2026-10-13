@@ -23,20 +23,34 @@ type TopicHandler = (topic: string, message: StrategyMessage) => void | Promise<
 /** Frame ids only need to be unique per socket; the scope never replays them. */
 const ids = createIdSource()
 
+/**
+ * Waits before each attempt to reopen a lost scope socket. A deploy restarts
+ * every Durable Object at once, so the delays are spread out (see `jitter`)
+ * instead of bringing every open room back in the same second.
+ */
+const RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 30_000]
+const jitter = (ms: number) => Math.round(ms * (0.5 + Math.random() / 2))
+
 class ScopeSocket {
   readonly handlers = new Map<string, Set<TopicHandler>>()
   readonly ready: Promise<ScopeSocket>
   private socket: WebSocket | null = null
   private readonly config: DurableObjectsRoomConfig['durableObjects']
+  private left = false
+  private attempts = 0
+  private retry: ReturnType<typeof setTimeout> | undefined
 
   constructor(config: DurableObjectsRoomConfig['durableObjects']) {
     this.config = config
-    this.ready = this.open()
+    // The first opening decides the join: if it fails, joining fails.
+    this.ready = this.open().then(() => this)
   }
 
-  private async open(): Promise<ScopeSocket> {
+  private async open(): Promise<void> {
     const transport = getDurableObjectsTransport(this.config.app)
     await transport.connect()
+    // Asked again on every opening: the scope may have been reset since the
+    // last one, and a fresh authorization is what lets this socket back in.
     const routeId = this.config.routeId ?? (
       await transport.requestScope(
         this.config.kind,
@@ -44,11 +58,11 @@ class ScopeSocket {
       )
     ).routeId
     if (!routeId) throw new Error('Durable Objects scope authorization failed')
+    if (this.left) return
 
     const url = new URL(`/api/realtime/signal/${encodeURIComponent(routeId)}`, location.href)
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     const socket = new WebSocket(url)
-    this.socket = socket
     socket.addEventListener('message', event => {
       const frame = decodeFrame(String(event.data))
       if (frame?.type !== 'signal' || !frame.payload || typeof frame.payload !== 'object') return
@@ -65,7 +79,30 @@ class ScopeSocket {
       socket.addEventListener('error', () => reject(new Error('Durable Objects signal socket failed')), { once: true })
       socket.addEventListener('close', () => reject(new Error('Durable Objects signal socket closed')), { once: true })
     })
-    return this
+    if (this.left) {
+      socket.close(1000, 'room left')
+      return
+    }
+    this.socket = socket
+    this.attempts = 0
+    // A Durable Object restart (every deploy is one) closes the socket while
+    // the room is still open. Peers that are already connected keep talking
+    // directly; reopening lets new ones find this room again, through the
+    // announcements Trystero keeps repeating.
+    socket.addEventListener('close', () => {
+      this.socket = null
+      this.reconnect()
+    })
+    if (this.handlers.size > 0) this.claimTopics()
+  }
+
+  private reconnect(): void {
+    if (this.left) return
+    const delay = RECONNECT_DELAYS_MS[Math.min(this.attempts, RECONNECT_DELAYS_MS.length - 1)]
+    this.attempts += 1
+    this.retry = setTimeout(() => {
+      this.open().catch(() => this.reconnect())
+    }, jitter(delay))
   }
 
   send(topic: string, message: StrategyMessage): void {
@@ -76,8 +113,9 @@ class ScopeSocket {
   /**
    * Tell the scope which topics this participant listens on, so offers,
    * answers and ICE addressed to one peer are delivered to that peer instead
-   * of broadcast to the whole room. Re-sent on every change because the scope
-   * keeps the claim on the socket, not in storage.
+   * of broadcast to the whole room. Re-sent on every change, and on every
+   * reopened socket, because the scope keeps the claim on the socket, not in
+   * storage.
    */
   claimTopics(): void {
     if (this.socket?.readyState !== WebSocket.OPEN) return
@@ -85,6 +123,8 @@ class ScopeSocket {
   }
 
   close(): void {
+    this.left = true
+    clearTimeout(this.retry)
     this.handlers.clear()
     this.socket?.close(1000, 'room left')
     this.socket = null

@@ -18,7 +18,8 @@ export type EnrollResult =
   | ({ readonly kind: 'failed' } & Backoff)
 
 export type SessionResult =
-  | { readonly kind: 'established'; readonly turn?: unknown }
+  /** `ice` is the session's ICE servers, unparsed: realtime/ice.ts validates them. */
+  | { readonly kind: 'established'; readonly ice?: unknown }
   /** The capability is no longer good; it must be discarded, not retried. */
   | { readonly kind: 'rejected' }
   | ({ readonly kind: 'failed' } & Backoff)

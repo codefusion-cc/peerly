@@ -29,7 +29,6 @@ import { loadLocalHistory, saveLocalHistory } from '../utils/historyStorage'
 import { mergeHistoryEntries } from '../utils/historyMerge'
 import { MAX_HISTORY_ENTRIES } from '../collab/constants'
 import { usePeerProfiles } from './collab/usePeerProfiles'
-import { useRelayWorkspacePresence } from './collab/useRelayWorkspacePresence'
 import { useProfileManager } from './collab/useProfileManager'
 import { useRoomAction } from './collab/useRoomAction'
 import { useVideoCall } from './collab/useVideoCall'
@@ -183,13 +182,6 @@ export function useCollab({
   }, [identityExpired, resetConnectionOnExpiry])
 
   const peers = usePeerProfiles(displayProfile)
-  const relayPresencePeers = useRelayWorkspacePresence({
-    enabled: !identityExpired,
-    workspaceId,
-    workspaceSecret,
-    selfUserId: identity?.selfUserId,
-    profile: displayProfile,
-  })
   const {
     reset: resetPeers,
     bindProfileAction,
@@ -882,11 +874,8 @@ export function useCollab({
   )
 
   const visiblePeers = useMemo(() => {
-    return aggregatePeersByUserId(
-      [...peers.peers, ...relayPresencePeers],
-      identity?.selfUserId
-    )
-  }, [peers.peers, relayPresencePeers, identity?.selfUserId])
+    return aggregatePeersByUserId(peers.peers, identity?.selfUserId)
+  }, [peers.peers, identity?.selfUserId])
   // One incoming call reaches every tab of this browser. The key names it the same in each, so only one tab rings and
   // answering or declining it in one tab settles it in all of them.
   const incomingStreamId = video.incomingCallPeerId

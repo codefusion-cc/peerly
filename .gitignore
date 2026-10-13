@@ -24,9 +24,6 @@ playwright-report
 blob-report
 coverage
 
-# Local dev runtime
-.relay-port
-
 # OS & editors
 .DS_Store
 Thumbs.db
@@ -44,7 +41,7 @@ Thumbs.db
 .cursor
 # wrangler dev state and generated bundles
 .wrangler
-dist-e2e
+dist-e2e*
 
 dist-preview
 reports/

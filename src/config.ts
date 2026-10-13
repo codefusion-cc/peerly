@@ -1,11 +1,7 @@
 import {
   getNostrRelayConfig as coreNostrConfig,
   getSupabaseRoomConfig as coreSupabaseConfig,
-  getTurnConfig as coreTurnConfig,
-  resolveRelayPort as corePort,
-  resolveRelayUrls as coreUrls,
   requireAppId,
-  type TurnServer as CoreTurnServer,
   type Env,
 } from '@peerly/core'
 
@@ -39,11 +35,7 @@ export const APP_ID = 'peerly-collab-v1'
 export const PUBLIC_NETWORK_ENV: Env = {
   VITE_APP_ID: import.meta.env.VITE_APP_ID,
   VITE_SIGNALING: import.meta.env.VITE_SIGNALING,
-  VITE_RELAY_HOST: import.meta.env.VITE_RELAY_HOST,
-  VITE_RELAY_HOSTS: import.meta.env.VITE_RELAY_HOSTS,
-  VITE_RELAY_PORT: import.meta.env.VITE_RELAY_PORT,
   VITE_NOSTR_RELAYS: import.meta.env.VITE_NOSTR_RELAYS,
-  VITE_TURN_URLS: import.meta.env.VITE_TURN_URLS,
   VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
   VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
 }
@@ -51,7 +43,7 @@ export const NETWORK_APP_ID = requireAppId(PUBLIC_NETWORK_ENV)
 
 export type ContentBackend = 'durable-objects' | 'p2p'
 
-/** Production remains P2P until cutover; the preview build explicitly enables DO. */
+/** Production keeps messages and files peer to peer; the preview build keeps them on the server. */
 export function resolveContentBackend(
   value: string | undefined = import.meta.env.VITE_CONTENT_BACKEND
 ): ContentBackend {
@@ -80,30 +72,17 @@ export function buildRoomId(workspaceId: string): string {
   return workspaceId.trim()
 }
 
-/** Used when VITE_SIGNALING=ws-relay (E2E / local relay). */
-export async function resolveRelayPort(): Promise<string> {
-  return corePort(PUBLIC_NETWORK_ENV)
-}
-
-export async function resolveRelayUrls(): Promise<string[]> {
-  return coreUrls(PUBLIC_NETWORK_ENV)
-}
-
 import type { SignalingStrategy } from './collab/signaling'
 
-// The relay list, TURN, and Supabase config logic moved to @peerly/core
-// (packages/core/src/relays.ts) so other apps can share them; these wrappers bind
-// them to this app's build-time env. `npm run check:relays` now reads the
-// list out of the package source.
-export { buildRelayUrls, DEFAULT_NOSTR_RELAYS, type TurnServer } from '@peerly/core'
+// The Nostr and Supabase dev signaling config lives in @peerly/core
+// (packages/core/src/relays.ts); these wrappers bind it to this app's
+// build-time env. `npm run check:relays` reads the list out of the package
+// source.
+export { DEFAULT_NOSTR_RELAYS } from '@peerly/core'
 
 /** Nostr relay URLs (wss://…). Override via VITE_NOSTR_RELAYS comma-separated env. */
 export function getNostrRelayConfig(): { urls: string[] } {
   return coreNostrConfig(PUBLIC_NETWORK_ENV)
-}
-
-export function getTurnConfig(): CoreTurnServer[] | undefined {
-  return coreTurnConfig(PUBLIC_NETWORK_ENV)
 }
 
 export function getSupabaseRoomConfig():

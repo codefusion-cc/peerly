@@ -1,10 +1,10 @@
 // HMAC-signed tokens (device-session capability, network cookie), opaque id
 // derivation, and device-signature verification for the realtime control
 // plane. The device-proof header scheme (x-peerly-device-key/request-ts/
-// request-nonce/request-signature) matches ../networkCredentials.mjs so the
-// same client-side signer code works against both endpoint families; OIDC
-// token verification for /api/network/enroll reuses `resolveOidcProvider` /
-// `verifyOidcToken` from that module directly.
+// request-nonce/request-signature) matches ../oidc.mjs so the same client-side
+// signer code works against both endpoint families; OIDC token verification
+// for /api/network/enroll reuses `resolveOidcProvider` / `verifyOidcToken`
+// from that module directly.
 
 const base64UrlBytes = value => {
   const normalized = value.replaceAll('-', '+').replaceAll('_', '/')
@@ -18,11 +18,6 @@ const bytesBase64Url = bytes => {
 }
 const textBase64Url = value => bytesBase64Url(new TextEncoder().encode(value))
 const bytesToHex = bytes => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
-const bytesBase64 = bytes => {
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary)
-}
 
 export { base64UrlBytes, bytesBase64Url, textBase64Url }
 
@@ -43,10 +38,9 @@ const MAX_DEVICE_REQUEST_AGE_MS = 60_000
 
 /**
  * Verify a live P-256 device signature over an endpoint-specific,
- * purpose-scoped payload carried in the same request headers as
- * `/api/network/credentials` (x-peerly-device-key/request-ts/request-nonce/
- * request-signature) — same scheme, generalized to an arbitrary payload so
- * new endpoints do not need OIDC claims in hand.
+ * purpose-scoped payload carried in the x-peerly-device-key/request-ts/
+ * request-nonce/request-signature headers, so endpoints do not need OIDC
+ * claims in hand.
  */
 export async function verifyDeviceSignature(headers, expectedDeviceKeyId, payloadBytes, now = Date.now()) {
   const deviceKeyId = headers.get('x-peerly-device-key') ?? ''
@@ -80,17 +74,6 @@ export async function verifyDeviceSignature(headers, expectedDeviceKeyId, payloa
 /** Purpose-scoped payload bytes signed by the client for a device-proof header set. */
 export function deviceProofBytes(purpose, app, deviceKeyId, timestamp, nonce, extra = '') {
   return new TextEncoder().encode([purpose, app, deviceKeyId, String(timestamp), nonce, extra].join('\n'))
-}
-
-/** Short-lived TURN REST credential, same HMAC-SHA-1 scheme as the legacy relay's coturn ticket. */
-export async function mintTurnCredential(env, { subject, now, ttlMs }) {
-  if (!env.TURN_AUTH_SECRET || !env.TURN_URLS) return null
-  const urls = env.TURN_URLS.split(',').map(value => value.trim()).filter(Boolean)
-  if (urls.length === 0) return null
-  const expiresAt = now + ttlMs
-  const username = `${Math.floor(expiresAt / 1000)}:${subject}`
-  const credential = bytesBase64(await hmac(env.TURN_AUTH_SECRET, 'SHA-1', username))
-  return { urls, username, credential, expiresAt }
 }
 
 /** SHA-256 hex digest, used for nonce single-use tracking (never store the raw nonce). */

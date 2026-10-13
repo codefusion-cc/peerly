@@ -230,11 +230,8 @@ export async function waitForSignaling(page: Page) {
   await expect(status).not.toContainText('Signaling offline', { timeout: 25_000 })
 }
 
-/** @deprecated Use waitForSignaling */
-export const waitForRelay = waitForSignaling
-
 export async function waitForPeerConnection(page: Page, timeout = 30_000) {
-  await waitForRelay(page)
+  await waitForSignaling(page)
   const status = page.getByTestId('connection-status')
   await expect(status).toContainText(/Connected \([1-9]\d* peers?\)/, { timeout })
 }
@@ -326,7 +323,7 @@ export async function withTwoUsers(
   const bob = await bobCtx.newPage()
 
   await joinWorkspace(alice, { name: 'Alice', email: 'alice@e2e.test' })
-  await waitForRelay(alice)
+  await waitForSignaling(alice)
   await joinWorkspace(bob, { name: 'Bob', email: 'bob@e2e.test' })
   await waitForPeerConnection(alice)
   await waitForPeerConnection(bob)

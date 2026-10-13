@@ -129,10 +129,8 @@ class DurableObjectTransport implements CoordinationTransport {
 }
 
 /**
- * Selects the Durable Objects transport when the deployment has flipped
- * `COORDINATION_BACKEND=durable-objects` (surfaced to the client via the
- * app's own runtime-config plumbing), otherwise `null` so the caller keeps
- * using its existing legacy-relay code path unchanged. Nothing above this
+ * The Durable Objects transport for `backend === 'durable-objects'`, otherwise
+ * `null` (a dev signaling strategy has no control plane). Nothing above this
  * function should import `DurableObjectTransport` or `RealtimeClient`
  * directly.
  */

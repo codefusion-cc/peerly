@@ -8,27 +8,25 @@ export {
   type SignalingStrategy,
 } from './signaling.js'
 export {
-  buildRelayUrls,
   DEFAULT_NOSTR_RELAYS,
-  expandTurnUrls,
-  getIceServers,
-  resolveIceServers,
   getNostrRelayConfig,
   getSupabaseRoomConfig,
-  getTurnConfig,
-  resolveRelayPort,
-  resolveRelayUrls,
-  type TurnServer,
 } from './relays.js'
 export {
-  clearRuntimeNetworkCredentials,
+  CLOUDFLARE_STUN_URL,
+  hasTurn,
+  parseIceGrant,
+  usableIceServers,
+  type IceGrant,
+  type IceServer,
+} from './realtime/ice.js'
+export {
+  clearRendezvousCache,
   configureRuntimeAuthCredentialProvider,
   configureRuntimeAuthTokenProvider,
   getRuntimeAuthCredential,
-  getRuntimeNetworkCredentials,
   lookupRendezvousId,
   type RuntimeAuthCredential,
-  type RuntimeNetworkCredentials,
 } from './runtimeCredentials.js'
 export {
   classifyJoinError,
@@ -52,24 +50,6 @@ export {
   type P2pIndicatorTone,
 } from './p2pIndicator.js'
 export { probeTurnCapability, resolveProbeIceServers, type TurnCapability } from './turnCapability.js'
-export {
-  allocateRequest,
-  attributeText,
-  authenticatedAllocateRequest,
-  decodeStun,
-  encodeStun,
-  errorCode,
-  randomTransactionId,
-  readChallenge,
-  STUN_ATTR,
-  STUN_CLASS,
-  STUN_METHOD,
-  turnRestCredential,
-  xorRelayedAddress,
-  type AuthChallenge,
-  type StunAttributes,
-  type StunMessage,
-} from './turnAllocate.js'
 export {
   canonicalizePublicKey,
   DeviceIdentity,
@@ -453,6 +433,8 @@ export { deriveChannelCapability } from './channelCapability.js'
 export type { RealtimeClientConfig } from './realtime/transport.js'
 export { selectDurableObjectsTransport, type CoordinationTransport } from './realtime/transport.js'
 export {
+  currentIceServers,
+  durableObjectsTurnAvailable,
   ensureDurableObjectsSession,
   sendRealtimeCommand,
 } from './realtime/runtime.js'

@@ -21,11 +21,8 @@
       "types": "./dist/react.d.ts",
       "default": "./dist/react.js"
     },
-    "./server/bounded-relay": {
-      "default": "./server/boundedRelay.mjs"
-    },
-    "./worker/network-credentials": {
-      "default": "./worker/networkCredentials.mjs"
+    "./worker/oidc": {
+      "default": "./worker/oidc.mjs"
     },
     "./worker/rendezvous": {
       "default": "./worker/rendezvous.mjs"
@@ -38,9 +35,6 @@
     },
     "./worker/realtime": {
       "default": "./worker/realtime/index.mjs"
-    },
-    "./server/coordination": {
-      "default": "./server/coordination.mjs"
     },
     "./realtime/protocol": {
       "types": "./dist/protocol/index.d.ts",
@@ -81,10 +75,8 @@
   },
   "files": [
     "dist",
-    "server",
     "worker",
     "scripts/check-vite-bundle.mjs",
-    "scripts/turn-smoke.mjs",
     "README.md",
     "LICENSE"
   ],
@@ -94,19 +86,14 @@
   },
   "dependencies": {
     "@trystero-p2p/core": "^0.25.3",
-    "@trystero-p2p/nostr": "^0.25.3",
-    "ws": "^8.18.3"
+    "@trystero-p2p/nostr": "^0.25.3"
   },
   "peerDependencies": {
     "@trystero-p2p/supabase": "^0.25.3",
-    "@trystero-p2p/ws-relay": "^0.25.3",
     "react": ">=18"
   },
   "peerDependenciesMeta": {
     "@trystero-p2p/supabase": {
-      "optional": true
-    },
-    "@trystero-p2p/ws-relay": {
       "optional": true
     },
     "react": {

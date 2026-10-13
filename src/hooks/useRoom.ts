@@ -45,10 +45,7 @@ const ERROR_TEXT = {
   'ice-failed': () =>
     'Found your teammate, but the connection was interrupted. Waiting for them to reconnect.',
   'needs-turn': () =>
-    'Found your teammate but could not open a direct connection — one of you is on a network that blocks peer-to-peer (strict NAT or firewall). A TURN server is needed; see VITE_TURN_URLS in the README.',
-  'relay-failed': (raw: string) =>
-    identityDeniedText(raw) ??
-    `Connection failed: ${raw}. Ensure the local relay is running (npm run dev:relay).`,
+    'Found your teammate, but your networks block a direct connection and this server has no relay to route around it. Try another network, such as mobile data.',
   'supabase-config': () =>
     'Supabase signaling is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
   generic: (raw: string) =>

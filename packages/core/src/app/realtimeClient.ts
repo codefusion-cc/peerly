@@ -7,7 +7,7 @@
  * Every failure this file has caused in production is now a named case with a
  * test: an enrolment loop from a cleared capability that still read as a
  * string, a session refresh that never happened so the cookie and the TURN
- * credential expired under a live socket, and a resume cursor that lived only
+ * credentials expired under a live socket, and a resume cursor that lived only
  * in memory so every page load replayed the retained stream.
  */
 import { CLIENT_TIMINGS, LIMITS } from '../protocol/limits.js'
@@ -164,11 +164,13 @@ export class RealtimeClient extends EventTarget {
         throw new Error('session-failed')
       }
 
+      // The ICE servers are good whether or not the socket opens, so a call
+      // can start on them while the socket retries.
+      this.dispatchEvent(new CustomEvent('ice', { detail: session.ice }))
       this.setState('connecting')
       await this.loadResumeCursor()
       await this.openChannel()
       this.setState('ready')
-      this.dispatchEvent(new CustomEvent('turn', { detail: session.turn }))
       this.startTimers()
     } catch (error) {
       if (error instanceof Error && error.message === 'upgrade-required') {
@@ -292,7 +294,7 @@ export class RealtimeClient extends EventTarget {
           const capability = await this.ensureCapability()
           const session = await this.options.api.establish(capability)
           if (session.kind === 'established') {
-            this.dispatchEvent(new CustomEvent('turn', { detail: session.turn }))
+            this.dispatchEvent(new CustomEvent('ice', { detail: session.ice }))
           }
         } catch {
           // A healthy socket is never torn down for a failed refresh; the next

@@ -16,18 +16,8 @@
     // build-time VITE_* variables are not available automatically.
     "VITE_GOOGLE_CLIENT_ID": "724645084534-eb9led5upjj8p46dr890tg3a0k3sonsk.apps.googleusercontent.com",
     "APP_ID": "peerly",
-    // Production stays on the legacy relay until the Durable Objects control
-    // plane passes its seven-day exit criteria (see
-    // docs/DURABLE_OBJECTS_ARCHITECTURE.md Phase 5).
-    //
-    // IMPORTANT: no `durable_objects`/`migrations` may appear in this file
-    // until that cutover PR. Workers Builds deployed every non-production
-    // branch with `wrangler versions upload` (CI now deploys only `main`, with
-    // a full deploy), and Cloudflare rejects any
-    // version that carries a Durable Object migration (API error 10211) —
-    // migrations only apply through a full deploy, which happens on merge to
-    // main. The DO-enabled staging worker lives in wrangler.preview.jsonc.
-    "COORDINATION_BACKEND": "legacy-relay",
+    // Signaling runs through the Durable Objects below; messages and files
+    // stay peer to peer. Keeping them on the server is preview's shape.
     "CONTENT_BACKEND": "p2p"
   },
   "assets": {
@@ -36,13 +26,69 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
+  // A missing secret fails the deploy instead of shipping a worker that
+  // refuses sessions. TURN_KEY_ID and TURN_KEY_API_TOKEN are the Cloudflare
+  // Realtime TURN key, provisioned through CodeFusion Console; without them
+  // calls fall back to STUN and the media health cron reports it.
+  "secrets": {
+    "required": [
+      "RENDEZVOUS_SECRET",
+      "NETWORK_SESSION_SECRET",
+      "OPAQUE_USER_ID_SECRET",
+      "TURN_KEY_ID",
+      "TURN_KEY_API_TOKEN"
+    ]
+  },
   "ratelimits": [
+    {
+      // Caps how often the public /api/media/health asks Cloudflare for TURN
+      // credentials, per location, beyond its one-minute shared answer.
+      "name": "MEDIA_RATE_LIMITER",
+      "namespace_id": "1007",
+      "simple": { "limit": 6, "period": 60 }
+    },
     {
       "name": "RENDEZVOUS_RATE_LIMITER",
       "namespace_id": "1001",
       "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      // Caps /api/network/enroll and /api/network/session, the only way to
+      // make the control plane spend Durable Object requests without already
+      // holding a socket.
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "1005",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      // Applied alongside AUTH_RATE_LIMITER, both must allow: a device key is
+      // a keypair the client can rotate, its address is not.
+      "name": "AUTH_IP_RATE_LIMITER",
+      "namespace_id": "1006",
+      "simple": { "limit": 60, "period": 60 }
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "USER_GATEWAYS", "class_name": "UserGatewayDO" },
+      { "name": "SIGNAL_SCOPES", "class_name": "SignalScopeDO" },
+      { "name": "CONTENT_CHANNELS", "class_name": "ContentChannelDO" },
+      { "name": "LOBBY_CHANNELS", "class_name": "LobbyChannelDO" }
+    ]
+  },
+  // Append-only, like preview's. Production's history starts here with all
+  // four classes, so it never carries preview's create-then-delete of
+  // WorkspaceDO. A migration only applies through `wrangler deploy`, which is
+  // what CI runs on main.
+  "migrations": [
+    {
+      "tag": "realtime-v1",
+      "new_sqlite_classes": ["UserGatewayDO", "SignalScopeDO", "ContentChannelDO", "LobbyChannelDO"]
+    }
+  ],
+  // Probes the TURN key every five minutes, so a revoked or expired key shows
+  // up as a failure in the logs before a call fails on it.
+  "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   // CodeFusion Console (codefusion-cc/codefusion-console) reads every
   // invocation for its Failures, Health and Logs pages, and reaches this
