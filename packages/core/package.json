@@ -85,6 +85,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
+    "@codefusion-cc/realtime-media": "^0.1.4",
     "@trystero-p2p/core": "^0.25.3",
     "@trystero-p2p/nostr": "^0.25.3"
   },

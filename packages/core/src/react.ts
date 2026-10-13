@@ -751,9 +751,9 @@ const roomTeardowns = new Map<string, Promise<void>>()
  * waiting join is cancelled, since its own teardown is then the one under way.
  */
 async function awaitRoomTeardown(key: string, cancelled: () => boolean): Promise<void> {
+  // Each teardown removes itself once done (see useRoom's cleanup).
   for (let pending = roomTeardowns.get(key); pending && !cancelled(); pending = roomTeardowns.get(key)) {
     await pending
-    if (roomTeardowns.get(key) === pending) roomTeardowns.delete(key)
   }
 }
 

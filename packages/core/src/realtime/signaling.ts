@@ -62,7 +62,7 @@ class ScopeSocket {
   private attempts = 0
   private retry: ReturnType<typeof setTimeout> | undefined
   private stable: ReturnType<typeof setTimeout> | undefined
-  private pending: Array<{ topic: string; message: StrategyMessage; at: number }> = []
+  private pending: Array<{ room: string; topic: string; message: StrategyMessage; at: number }> = []
 
   constructor(config: ScopeConfig) {
     this.config = config
@@ -127,8 +127,8 @@ class ScopeSocket {
     const fresh = Date.now() - PENDING_MAX_AGE_MS
     const pending = this.pending
     this.pending = []
-    for (const { topic, message, at } of pending) {
-      if (at >= fresh) this.send(topic, message)
+    for (const { room, topic, message, at } of pending) {
+      if (at >= fresh) this.send(room, topic, message)
     }
   }
 
@@ -153,13 +153,22 @@ class ScopeSocket {
     }
   }
 
-  send(topic: string, message: StrategyMessage): void {
+  /** Sends what `room` says on `topic`, or holds it until the socket opens. */
+  send(room: string, topic: string, message: StrategyMessage): void {
     if (this.socket?.readyState !== WebSocket.OPEN) {
-      this.pending.push({ topic, message, at: Date.now() })
+      this.pending.push({ room, topic, message, at: Date.now() })
       if (this.pending.length > PENDING_LIMIT) this.pending.shift()
       return
     }
     this.socket.send(encodeFrame('signal', { id: ids.next(), payload: { topic, message } }))
+  }
+
+  /**
+   * Drops what a room that left held for the socket: its announcements would
+   * draw offers to topics nobody listens on any more.
+   */
+  forget(room: string): void {
+    this.pending = this.pending.filter(held => held.room !== room)
   }
 
   /**
@@ -200,7 +209,8 @@ class ScopeHub {
   private readonly sockets = new Map<string, ScopeSocket>()
 
   subscribe(room: { appId: string; roomId: string }, topic: string, onMessage: TopicHandler): () => void {
-    const scope = roomScopes.get(roomKey(room.appId, room.roomId))
+    const joined = roomKey(room.appId, room.roomId)
+    const scope = roomScopes.get(joined)
     if (!scope) throw new Error('Durable Objects room has no scope')
     const key = scopeKey(scope)
     let socket = this.sockets.get(key)
@@ -212,6 +222,8 @@ class ScopeHub {
     const owner = socket
     return () => {
       unsubscribe()
+      // Trystero lets go of a room's topics only when the room leaves.
+      owner.forget(joined)
       if (!owner.idle) return
       owner.close()
       if (this.sockets.get(key) === owner) this.sockets.delete(key)
@@ -219,10 +231,14 @@ class ScopeHub {
   }
 
   publish(room: { appId: string; roomId: string }, topic: string, message: StrategyMessage): void {
-    const scope = roomScopes.get(roomKey(room.appId, room.roomId))
-    if (scope) this.sockets.get(scopeKey(scope))?.send(topic, message)
+    const joined = roomKey(room.appId, room.roomId)
+    const scope = roomScopes.get(joined)
+    if (scope) this.sockets.get(scopeKey(scope))?.send(joined, topic, message)
   }
 }
+
+/** Rooms Trystero has handed out, to tell a new room from one still open. */
+const joinedRooms = new WeakSet<object>()
 
 const joinScopedRoom = createTopicStrategy<ScopeHub, DurableObjectsRoomConfig>({
   init: () => new ScopeHub(),
@@ -232,8 +248,15 @@ const joinScopedRoom = createTopicStrategy<ScopeHub, DurableObjectsRoomConfig>({
 
 /** Joins a room whose peers find each other through its Durable Object scope. */
 export const joinDurableObjectsRoom: JoinRoom<DurableObjectsRoomConfig> = (config, roomId, callbacks) => {
-  roomScopes.set(roomKey(config.appId, roomId), config.durableObjects)
-  return joinScopedRoom(config, roomId, callbacks)
+  const key = roomKey(config.appId, roomId)
+  const previous = roomScopes.get(key)
+  roomScopes.set(key, config.durableObjects)
+  const room = joinScopedRoom(config, roomId, callbacks)
+  // Trystero hands back a room joined again while still open as it is, still
+  // subscribed through its first scope, so that scope stays its own.
+  if (!joinedRooms.has(room)) joinedRooms.add(room)
+  else if (previous) roomScopes.set(key, previous)
+  return room
 }
 
 export type { DurableObjectsRoomConfig }

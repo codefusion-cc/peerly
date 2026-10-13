@@ -13,7 +13,8 @@ vi.mock('./runtime.js', () => ({ getDurableObjectsTransport: () => transport }))
  * Trystero, cut down to what it does with a topic strategy: it makes one relay
  * (`init`) for every room joined while any room is open, from the first room's
  * config, then subscribes each room's self and root topics on that relay and
- * unsubscribes them when the room leaves.
+ * unsubscribes them when the room leaves. A room joined again while it is
+ * still open is handed back as it is, whatever the new config says.
  */
 type Handler = (topic: string, message: unknown) => void
 type RoomContext = { appId: string; roomId: string }
@@ -22,11 +23,13 @@ type Adapter = {
   subscribeTopic(relay: unknown, topic: string, onMessage: Handler, room: RoomContext): () => void
   publishTopic(relay: unknown, topic: string, message: unknown, room: RoomContext): void
 }
-const trystero = vi.hoisted(() => ({ adapter: null as unknown, relay: null as unknown, open: 0 }))
+const trystero = vi.hoisted(() => ({ adapter: null as unknown, relay: null as unknown, open: 0, rooms: new Map<string, unknown>() }))
 vi.mock('@trystero-p2p/core', () => ({
   createTopicStrategy: (adapter: unknown) => {
     trystero.adapter = adapter
     return (config: { appId: string }, roomId: string) => {
+      const occupied = trystero.rooms.get(`${config.appId}\n${roomId}`)
+      if (occupied) return occupied
       const { init, subscribeTopic, publishTopic } = adapter as Adapter
       if (trystero.open === 0) trystero.relay = init(config)
       trystero.open += 1
@@ -35,16 +38,19 @@ vi.mock('@trystero-p2p/core', () => ({
       const offs = [`${roomId}/self`, `${roomId}/root`].map(topic =>
         subscribeTopic(trystero.relay, topic, (_, message) => received.push(message), room))
       let left = false
-      return {
+      const joined = {
         received,
         send: (topic: string, message: unknown) => publishTopic(trystero.relay, topic, message, room),
         leave: () => {
           if (left) return
           left = true
+          trystero.rooms.delete(`${config.appId}\n${roomId}`)
           offs.forEach(off => off())
           trystero.open -= 1
         },
       }
+      trystero.rooms.set(`${config.appId}\n${roomId}`, joined)
+      return joined
     }
   },
 }))
@@ -114,6 +120,7 @@ beforeEach(() => {
   vi.spyOn(Math, 'random').mockReturnValue(1)
   sockets.length = 0
   trystero.open = 0
+  trystero.rooms.clear()
   transport.connect.mockReset()
   transport.connect.mockResolvedValue(undefined)
   transport.requestScope.mockReset()
@@ -206,6 +213,34 @@ describe('rooms open at the same time', () => {
 
     second.leave()
     expect(sockets[0].closedWith).toEqual([1000, 'room left'])
+  })
+
+  it('keep a room on its own scope when it is joined again with another scope while still open', async () => {
+    const room = await join(routedConfig, 'room-1')
+    const again = enter({ appId: 'peerly', durableObjects: { ...scope, routeId: 'other-route' } }, 'room-1')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(again).toBe(room)
+    room.send('room-1/root', 'announce')
+    expect(sockets).toHaveLength(1)
+    expect(sockets[0].sent.at(-1)?.payload).toEqual({ topic: 'room-1/root', message: 'announce' })
+  })
+
+  it('drop what a room said before it left while their shared scope was away, and keep what the open room said', async () => {
+    const first = await join(routedConfig, 'room-1')
+    const second = enter(routedConfig, 'room-2')
+    await vi.advanceTimersByTimeAsync(0)
+    sockets[0].drop()
+    first.send('room-1/root', 'announce of the left room')
+    second.send('room-2/root', 'announce')
+    first.leave()
+    await vi.advanceTimersByTimeAsync(1_000)
+    await vi.waitFor(() => expect(sockets).toHaveLength(2))
+    latest().accept()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(latest().sent.map(frame => frame.payload)).toEqual([
+      { subscribe: ['room-2/self', 'room-2/root'] },
+      { topic: 'room-2/root', message: 'announce' },
+    ])
   })
 
   it('reopen the scope of a room left and rejoined while another room keeps the relay alive', async () => {
