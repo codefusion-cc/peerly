@@ -47,10 +47,10 @@ flowchart TB
   Channel --> Files
 ```
 
-Preview uses Durable Objects for authenticated discovery and for bounded,
-client-encrypted message/reaction/channel history. File bodies and call media
-remain peer-to-peer. A complete P2P content adapter remains available as an
-explicit deployment rollback.
+Every deployment uses Durable Objects for authenticated discovery and
+signaling. Preview also keeps bounded, client-encrypted message, reaction and
+channel history there; production keeps content peer to peer. File bodies and
+call media are peer to peer in both.
 
 ---
 
@@ -188,15 +188,15 @@ Route → panel mapping:
 | Section | Functions |
 |---------|-----------|
 | Workspace header | Name, avatar, open settings |
-| Connection | `ConnectionStatus`, relay online, RTC peer count, `P2pCapabilityIndicator` |
-| Relay diagnostics | `useRelayDiagnostics` / health probes (Nostr) |
+| Connection | `ConnectionStatus`, signaling online (`relayOnline`), RTC peer count, `P2pCapabilityIndicator` |
+| Relay diagnostics | `useRelayDiagnostics` / health probes (Nostr dev builds only) |
 | Channels | List public channels; add / rename / delete / reorder |
 | Direct messages | List DMs; start DM from peer; close local DM thread |
 | Peers | Online peers with unread badges; start DM |
 | Invite | `InvitePeople` — footer popover: copy link; creator can add/remove emails on allow-list |
 | You | Profile entry; leave workspace; theme; build stamp |
 
-Channel mutations (local store + encrypted durable event, or P2P in rollback mode):
+Channel mutations (local store + encrypted durable event with Durable Objects content, or P2P):
 
 | Action | Local store | Network |
 |--------|-------------|---------|
@@ -218,7 +218,7 @@ Path: `/workspace/channel/:channelId` optional `?files=1`
 |------|----------|
 | Header | Channel name or DM peer avatar; open sidebar (mobile); **video call**; **Files** toggle |
 | Sync bar | `SyncStatusBar` — history / file sync progress |
-| Banners | Connection notice/error (non-relay-offline), file errors, media errors, **incoming call** |
+| Banners | Connection notice/error (other than signaling offline), file errors, media errors, **incoming call** |
 | Call UI | `VideoCall` when `inCall` |
 | History | `MessageList` — text, files, reactions, edit/delete, NSFW blur, “new messages” pill |
 | Composer | `MessageInput` — text, multi-file, paste, drag-drop |
@@ -271,7 +271,7 @@ Path: `/workspace/settings`
 | File sync mode | `loadFileSyncMode` / `saveFileSyncMode` — on-demand vs auto-download full files |
 | Notifications | enable/disable background DM notifications |
 | Sounds | enable/disable attention + ringtone |
-| Relay health | `RelayHealthCard` (Nostr probe) |
+| Relay health | `RelayHealthCard` (Nostr probe, dev builds only) |
 | P2P capability | Indicator + retry |
 | Storage | `BrowserStorageCard`, per-workspace usage |
 | Free local space | `clearWorkspaceFiles` — drop cached originals, keep metadata |
@@ -401,9 +401,9 @@ user can re-open without the invite link.
 
 | Piece | Role |
 |-------|------|
-| `getSignalingStrategy` | `nostr` (default) / `ws-relay` / `supabase` from env |
-| `DEFAULT_NOSTR_RELAYS` / `VITE_NOSTR_RELAYS` | Curated public relays for discovery only |
-| TURN env vars | Optional for strict NAT |
+| `getSignalingStrategy` | `durable-objects` (default) / `nostr` / `supabase` from `VITE_SIGNALING`; the last two for development |
+| `DEFAULT_NOSTR_RELAYS` / `VITE_NOSTR_RELAYS` | Curated public relays for Nostr discovery in development |
+| ICE servers | Cloudflare STUN and one-hour TURN credentials from the control session (`/api/network/session`) |
 | `useRelayDiagnostics` | Echo-probe healthy relays (Nostr) |
 | `useP2pCapability` | Local capability before blaming network |
 

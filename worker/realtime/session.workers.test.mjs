@@ -63,7 +63,6 @@ function fakeOutside(turn = cloudflareTurn) {
 describe('ICE servers on the control session', () => {
   it('gives each of two people their own Cloudflare TURN credentials, valid for an hour', async () => {
     fakeOutside()
-    const before = Date.now()
     const alice = await signIn(deployment(turnKey), 'alice@e2e.test', 'sub-alice')
     const bob = await signIn(deployment(turnKey), 'bob@e2e.test', 'sub-bob')
 
@@ -80,8 +79,7 @@ describe('ICE servers on the control session', () => {
           credential: `credential-${n}`,
         },
       ])
-      expect(person.session.ice.expiresAt).toBeGreaterThanOrEqual(before + 3_600_000)
-      expect(person.session.ice.expiresAt).toBeLessThanOrEqual(Date.now() + 3_600_000)
+      expect(person.session.ice.ttlMs).toBe(3_600_000)
     }
     // The key's API token goes to Cloudflare and nowhere else.
     const [, request] = turnApi.mock.calls[0]

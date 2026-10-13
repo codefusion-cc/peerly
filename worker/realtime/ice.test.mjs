@@ -15,9 +15,9 @@ afterEach(() => {
 describe('issueIceServers', () => {
   it('adds Cloudflare TURN to STUN, expiring with the credentials', async () => {
     const fetcher = vi.fn(async () => answer())
-    await expect(issueIceServers(turnKey, { now: 1_000, fetcher })).resolves.toEqual({
+    await expect(issueIceServers(turnKey, { fetcher })).resolves.toEqual({
       servers: [CLOUDFLARE_STUN, { urls: ['turns:turn.cloudflare.com:443?transport=tcp'], username: 'u', credential: 'c' }],
-      expiresAt: 1_000 + 3_600_000,
+      ttlMs: 3_600_000,
     })
   })
 

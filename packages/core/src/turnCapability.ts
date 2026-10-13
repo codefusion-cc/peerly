@@ -1,5 +1,5 @@
 import { requireAppId, type Env } from './env.js'
-import { hasTurn, type IceServer } from './realtime/ice.js'
+import { hasRelay, type IceServer } from '@codefusion-cc/realtime-media/ice'
 import { resolveSignalingStrategy } from './signaling.js'
 
 export type TurnCapability = {
@@ -43,7 +43,7 @@ export async function probeTurnCapability(
     if (!iceServers) throw new Error('TURN credentials are unavailable. Sign in again and retry.')
     // The deployment decides: without a TURN key the session hands out STUN
     // alone, and there is nothing to allocate.
-    if (!hasTurn(iceServers)) {
+    if (!hasRelay(iceServers)) {
       return { status: 'not-configured', detail: 'TURN is not configured.', transports: [] }
     }
     connection = new RTCPeerConnection({ iceServers, iceTransportPolicy: 'relay' })

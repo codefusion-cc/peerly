@@ -40,8 +40,8 @@ export async function prepareAuthenticatedRealtimeUpgrade(request, env, config) 
  * auth bridge, static assets) follow.
  *
  * `config`: `{ app, allowedOrigin(origin): boolean, requirePublicUserId?,
- * requirePrivateMemberId?, iceServers?(env, { now }) }`. `iceServers` answers
- * the ICE servers a session hands its browser, as `{ servers, expiresAt }`;
+ * requirePrivateMemberId?, iceServers?(env) }`. `iceServers` answers the ICE
+ * servers a session hands its browser, as `{ servers, ttlMs }`;
  * without it the browser keeps its WebRTC library's defaults.
  */
 export async function handleRealtimeRoute(request, env, config) {

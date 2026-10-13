@@ -12,14 +12,7 @@ export {
   getNostrRelayConfig,
   getSupabaseRoomConfig,
 } from './relays.js'
-export {
-  CLOUDFLARE_STUN_URL,
-  hasTurn,
-  parseIceGrant,
-  usableIceServers,
-  type IceGrant,
-  type IceServer,
-} from './realtime/ice.js'
+export { parseIceGrant, usableIceServers, type IceGrant } from './realtime/ice.js'
 export {
   clearRendezvousCache,
   configureRuntimeAuthCredentialProvider,

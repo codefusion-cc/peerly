@@ -18,9 +18,11 @@ export const TURN_WAIT_MS = 3_000
  * an error line, which the console turns into a failure, and the media health
  * check (`/api/media/health`, the cron) says the same.
  *
- * `expiresAt` is when the TURN credentials stop working; STUN alone has none.
+ * `ttlMs` is how long the TURN credentials work from now; STUN alone has
+ * none. A lifetime rather than a moment, so the browser measures it on its own
+ * clock, however far that is from the Worker's.
  */
-export async function issueIceServers(env, { now = Date.now(), fetcher = fetch, waitMs = TURN_WAIT_MS } = {}) {
+export async function issueIceServers(env, { fetcher = fetch, waitMs = TURN_WAIT_MS } = {}) {
   const stunOnly = { servers: [CLOUDFLARE_STUN] }
   if (!turnConfigured(env)) return stunOnly
   let timer
@@ -31,7 +33,7 @@ export async function issueIceServers(env, { now = Date.now(), fetcher = fetch, 
       console.error(`turn: Cloudflare gave no TURN credentials within ${waitMs} ms; the session got STUN only`)
       return stunOnly
     }
-    return { servers: turn.iceServers, expiresAt: now + turn.ttlMs }
+    return { servers: turn.iceServers, ttlMs: turn.ttlMs }
   } catch (error) {
     console.error(`turn: ${error instanceof Error ? error.message : 'failed'}; the session got STUN only`)
     return stunOnly

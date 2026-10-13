@@ -1,49 +1,50 @@
 # Repo map
 
-Peerly: encrypted team collaboration (workspaces, chat, files, video calls) as a React SPA. Peers talk over WebRTC; production coordinates through a self-hosted relay, `preview.peerly.cc` through a Worker with Durable Objects.
-Per-screen behavior is in [views.md](views.md); several tabs of one browser in [two-tabs.md](two-tabs.md); DO design in [DURABLE_OBJECTS_ARCHITECTURE.md](DURABLE_OBJECTS_ARCHITECTURE.md); relay and TURN in [relay-deployment.md](relay-deployment.md); structure, deploy and CI in [README.md](../README.md).
+Peerly: encrypted team collaboration (workspaces, chat, files, video calls) as a React SPA. Peers talk over WebRTC and signal through a Worker with Durable Objects. Production keeps messages peer to peer; `preview.peerly.cc` keeps them in Durable Objects.
+Per-screen behavior is in [views.md](views.md); several tabs of one browser in [two-tabs.md](two-tabs.md); DO design in [DURABLE_OBJECTS_ARCHITECTURE.md](DURABLE_OBJECTS_ARCHITECTURE.md); TURN, structure, deploy and CI in [README.md](../README.md).
 
 ## Layout
 
 - `src/` the app. `App.tsx` session bootstrap and workspace routing, `routing.ts`, `config.ts` build config, `session.ts`, `i18n.tsx`.
 - `src/collab/` app policy: workspace stores, creator-signed allow-lists (`allowList.ts`), message signing, identity providers, DM and friends stores, mesh (`mesh.ts`), sibling tabs and once-per-browser attention (`browserTabs.ts`).
 - `src/components/` UI (join, workspace, chat, files, `VideoCall.tsx`), `src/hooks/` room, collab and auth wiring (`useCollab.ts`, `useRoom.ts`), `src/context/` collab context, `src/protocol/` message types and mappers, `src/realtime/content.ts` DO content client.
-- `packages/core/` published `@peerly/core`: generic rooms, signaling, device identity, per-tab session keys (`tabSession.ts`), peer handshake (`peerIdentityHandshake.ts`), OIDC checks, media, `worker/` (Google auth, rendezvous, `realtime/` DO runtime), `server/` (relay). The app imports it from source through an alias.
-- `worker/index.mjs` production Worker (API routes, assets); `worker/console/` the `ConsoleAdmin` entrypoint CodeFusion Console binds, and its manifest of Worker secrets; `worker/realtime/` Peerly's DO classes (`gateway.mjs`, `lobbyChannel.mjs`, `contentChannel.mjs`, `commands/`); `worker/usageWatch.mjs` with `wrangler.usage-watch.jsonc`.
-- `server/` dev and test servers and the production relay (`relay.mjs`, `relay-prod.mjs`). `infra/` coturn, nginx, systemd, firewall for the VPS.
-- `e2e/` Playwright specs, `scripts/` bundle and CSP guards, relay checks, version bump. `docs/` implementation notes.
-- Configs: `wrangler.jsonc` (production), `wrangler.preview.jsonc` (staging with DOs; the only config with DO migrations), `wrangler.e2e.jsonc`, `vitest.config.ts`, `vitest.workers.config.ts`, `playwright*.config.ts`.
+- `packages/core/` published `@peerly/core`: generic rooms, signaling, device identity, per-tab session keys (`tabSession.ts`), peer handshake (`peerIdentityHandshake.ts`), OIDC checks, media, `worker/` (Google auth, rendezvous, `realtime/` DO runtime), `src/realtime/` (DO signaling client, ICE servers). The app imports it from source through an alias.
+- `worker/index.mjs` the Worker for production and preview (API routes, assets, media health cron); `worker/realtime/` Peerly's DO classes (`gateway.mjs`, `lobbyChannel.mjs`, `contentChannel.mjs`, `commands/`) and Cloudflare TURN credentials (`ice.mjs`); `worker/console/` the `ConsoleAdmin` entrypoint CodeFusion Console binds, and its manifest of Worker secrets; `worker/usageWatch.mjs` with `wrangler.usage-watch.jsonc`.
+- `server/` dev server (`dev.mjs`, Nostr signaling) and E2E server (`test-server.mjs p2p|durable-objects`).
+- `e2e/` Playwright specs, `scripts/` bundle and CSP guards, Nostr relay check, `verify-production.mjs`, version bump. `docs/` implementation notes.
+- Configs: `wrangler.jsonc` (production, `CONTENT_BACKEND=p2p`), `wrangler.preview.jsonc` (staging, `CONTENT_BACKEND=durable-objects`; otherwise only names and migration history differ), `wrangler.e2e.jsonc`, `vitest.config.ts`, `vitest.workers.config.ts`, `playwright*.config.ts`.
 
 ## Main flows
 
 - Sign-in: `src/collab/providerSignIn.ts` -> provider ID token -> `/api/auth/google/*` (`packages/core/worker/googleAuth.mjs`) or verified in the browser -> device key in IndexedDB. Each tab adds an in-memory tab key the device key certifies; workspace handshakes (`src/collab/identityHandshake.ts`) prove possession with it, so tabs of one browser are distinct peers.
-- Production chat: `src/hooks/useRoom.ts` -> `@peerly/core` `joinRoom` -> relay `wss://relay.peerly.cc` signaling -> WebRTC peers; messages signed (`src/collab/messageSigning.ts`), stored in localStorage.
-- Network credentials: `/api/network/credentials` (`worker/index.mjs`) -> relay tickets and TURN credentials.
-- Preview (DO mode): `src/realtime/content.ts` -> `/api/realtime/*` -> `handleRealtimeRoute` -> `UserGateway`, lobby and content channel DOs (`worker/realtime/`) -> DO SQLite.
+- Production chat: `src/hooks/useRoom.ts` -> `@peerly/core` `joinRoom` -> `SignalScopeDO` signaling (`packages/core/src/realtime/signaling.ts`) -> WebRTC peers; messages signed (`src/collab/messageSigning.ts`), stored in localStorage.
+- Session and ICE: `/api/network/session` -> session cookie plus `ice: { servers, ttlMs }` from `worker/realtime/ice.mjs` (Cloudflare STUN, one-hour TURN credentials). `/api/media/health` and the five-minute cron check the TURN key.
+- Preview (DO content): `src/realtime/content.ts` -> `/api/realtime/*` -> `handleRealtimeRoute` -> `UserGateway`, lobby and content channel DOs (`worker/realtime/`) -> DO SQLite.
 - Calls and files: `VideoCall.tsx` and `FilesPanel.tsx` over WebRTC, never through the Worker.
 
 ## @codefusion-cc packages
 
-Only `console`: the Worker's `ConsoleAdmin` (`worker/console/`), `/version.json` and the build identity (`build-info.mjs`, `vite.config.ts`), and the CLI (`codefusion-console cloudflare <scopes> -- <command>` for Cloudflare commands, `codefusion-console secrets peerly` for the Worker secrets). Both Workers' invocations go to the console as their tail consumer. Shared product code is `@peerly/core` in `packages/core`.
+`realtime-media` (Cloudflare TURN credentials and the media health check) and `console`: the Worker's `ConsoleAdmin` (`worker/console/`), `/version.json` and the build identity (`build-info.mjs`, `vite.config.ts`), and the CLI (`codefusion-console cloudflare <scopes> -- <command>` for Cloudflare commands, `codefusion-console secrets peerly` for the Worker secrets). Both Workers' invocations go to the console as their tail consumer. Shared product code is `@peerly/core` in `packages/core`.
 
 ## Tests and checks
 
 - Typecheck `npm run typecheck`; lint `npm run lint` (oxlint); build `npm run build` (also bundle, size and `guard:preview` guards: link-preview tags, `og-v1.jpg` and `robots.txt` in `dist/`; a new preview image gets a new file name).
 - Unit (jsdom, `src/`, `packages/core/src`, `worker/**/*.test.mjs`): `npm test -- --maxWorkers=2`. Worker (workerd, `*.workers.test.*` in `packages/core/worker/realtime` and `worker/`): `npm run test:workers`; `npm run worker:check` after changing a wrangler config.
-- E2E (Playwright): `npm run test:e2e` (local relay), `npm run test:e2e:do` (built app behind the real Worker and DOs), `npm run test:a11y`. `test:mutation` (incremental) is a CI gate the deploy waits for; the weekly full re-test is in `security.yml`.
+- E2E (Playwright): `npm run test:e2e` and `npm run test:e2e:do` (built app behind the real Worker and DOs, p2p and DO content), `npm run test:a11y`. `test:mutation` (incremental) is a CI gate the deploy waits for; the weekly full re-test is in `security.yml`.
 - CI (`.github/workflows/ci.yml`) also runs audit, coverage, `check:csp` and mutation testing (the deploy needs it).
 
 ## Deploy and migrations
 
-- Merge to `main`: the `deploy production` job in `ci.yml` builds with the relay settings and runs `wrangler deploy` to https://peerly.cc, then checks the served entry script.
+- Merge to `main`: the `deploy production` job in `ci.yml` builds, runs `wrangler deploy` to https://peerly.cc, checks the served entry script and runs `npm run verify:production` (HSTS, TURN health).
 - Staging `preview.peerly.cc` is manual: `codefusion-console cloudflare workers:edit,domains:edit -- npm run deploy:preview` (README "Durable Objects control plane"). Output goes to `dist-preview/`.
-- DO migrations exist only in `wrangler.preview.jsonc` until the production cutover (`docs/DURABLE_OBJECTS_CUTOVER.md`); there is no SQL database.
+- DO migrations live in each wrangler config with its own history; there is no SQL database.
 - `@peerly/core` releases: manual `release-core.yml` (npm Trusted Publishing).
 
 ## Gotchas
 
 - `VITE_APP_ID=peerly` is needed for vite, tsc and tests; use the npm scripts, not bare `npx`.
-- Do not put a DO `migrations` block in `wrangler.jsonc` before the cutover: non-main branch builds use `versions upload`, which Cloudflare rejects with migrations.
+- `npm run dev` signals through public Nostr: the Vite dev server has no Worker. Use the E2E servers to exercise the Durable Objects path.
+- TURN secrets (`TURN_KEY_ID`, `TURN_KEY_API_TOKEN`) are provisioned through CodeFusion Console, never set by hand.
 - Workspace semantics (allow-lists, handshakes, history sanitization) stay in `src/collab`, not in `packages/core`. Generic code goes to the package.
 - Node 24.18.0 / npm 11.16.0 are enforced (`.nvmrc`, `.npmrc`, CI); a mismatch exits early.
 - Google sign-in on branch previews needs `VITE_GOOGLE_AUTH_BRIDGE_ORIGIN` (README "Testing branches with Google sign-in").

@@ -244,7 +244,7 @@ export async function handleSession(request, env, config) {
   })
   // The ICE servers ride the session, so the refresh that renews the cookie
   // every `sessionRefreshMs` renews them too, well inside their lifetime.
-  const ice = config.iceServers ? await config.iceServers(env, { now }) : null
+  const ice = config.iceServers ? await config.iceServers(env) : null
 
   return json(
     { runtimeConfig: { protocolVersion: LIMITS.protocolVersion }, ...(ice ? { ice } : {}) },

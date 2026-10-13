@@ -18,8 +18,8 @@ const PRIVATE_HANDSHAKE_TIMEOUT_MS = 12_000
 // the package can't know the password is a "workspace password" or that the
 // other peer is a "teammate".
 /**
- * A denied handshake is the trust model working, not a network problem — "check your network" (or "is the local relay
- * running?", which is how the ws-relay strategy reports every join error) would send the user debugging the wrong thing.
+ * A denied handshake is the trust model working, not a network problem — "check your network" would send the user
+ * debugging the wrong thing.
  */
 function identityDeniedText(raw: string): string | null {
   if (!raw.includes(IDENTITY_DENIED_PREFIX)) return null

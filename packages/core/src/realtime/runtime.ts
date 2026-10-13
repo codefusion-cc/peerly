@@ -1,7 +1,8 @@
 import { getRuntimeAuthCredential } from '../runtimeCredentials.js'
 import { RealtimeClient } from '../app/realtimeClient.js'
 import { selectDurableObjectsTransport, type CoordinationTransport } from './transport.js'
-import { hasTurn, parseIceGrant, usableIceServers, type IceGrant, type IceServer } from './ice.js'
+import { hasRelay, type IceServer } from '@codefusion-cc/realtime-media/ice'
+import { parseIceGrant, usableIceServers, type IceGrant } from './ice.js'
 import { requireAppId, type Env } from '../env.js'
 import { resolveSignalingStrategy } from '../signaling.js'
 
@@ -39,6 +40,9 @@ export function getDurableObjectsTransport(app: string): CoordinationTransport {
     // A session that was still being established when its socket closed (a
     // sign-out, an account switch) must not hand its servers to the next one.
     if (transports.get(app) !== transport) return
+    // The session has answered, usable or not: a join waiting for it gains
+    // nothing by waiting out ICE_WAIT_MS.
+    iceArrival(app).resolve()
     const grant = parseIceGrant((event as CustomEvent<unknown>).detail, Date.now())
     if (!grant) {
       // Keep the last good grant: it is still the best this tab has, and it
@@ -46,8 +50,12 @@ export function getDurableObjectsTransport(app: string): CoordinationTransport {
       console.warn('[peerly] the session sent no usable ICE servers')
       return
     }
+    // A refresh without TURN is Cloudflare's API failing for a moment or a
+    // key being removed. TURN credentials already held stay valid until they
+    // expire, and are still better than STUN alone until then.
+    const held = iceGrants.get(app)
+    if (!hasRelay(grant.servers) && held && hasRelay(usableIceServers(held, Date.now()))) return
     iceGrants.set(app, grant)
-    iceArrival(app).resolve()
   })
   transports.set(app, transport)
   return transport
@@ -85,7 +93,7 @@ export function currentIceServers(app: string, now = Date.now()): IceServer[] {
 
 /** Whether a peer connection made now could relay through TURN. */
 export function durableObjectsTurnAvailable(app: string, now = Date.now()): boolean {
-  return hasTurn(currentIceServers(app, now))
+  return hasRelay(currentIceServers(app, now))
 }
 
 /**

@@ -906,7 +906,7 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
       })
 
       if (cancelled) {
-        void joined.leave()
+        await joined.leave()
         return
       }
 
@@ -915,16 +915,20 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
       setRoom(joined)
     }
 
-    void setup()
+    const joining = setup()
 
     return () => {
       cancelled = true
       const active = instanceRef.current
       instanceRef.current = null
-      if (active) {
-        // Record the teardown so the next join can await it rather than race it.
-        teardownRef.current = Promise.resolve(active.leave()).catch(() => {})
-      }
+      // Record the teardown so the next join can await it rather than race it.
+      // A join still under way leaves its room itself once it lands; the next
+      // join must wait for that too, because Trystero hands a second join of
+      // the same room id the room it has not let go of yet, which this
+      // teardown is about to leave.
+      teardownRef.current = active
+        ? Promise.resolve(active.leave()).catch(() => {})
+        : joining.catch(() => {})
       setRoom(null)
     }
   }, [appId, roomId, password, strategy, onPeerHandshake, handshakeTimeoutMs, recoverIceFailures, rejoinNonce, setRoom])

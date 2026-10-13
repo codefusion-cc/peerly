@@ -22,9 +22,14 @@ const PORT = Number(process.env.TEST_PORT) || (CONTENT === 'p2p' ? 17273 : 17275
 const ORIGIN = `http://127.0.0.1:${PORT}`
 const DIST = CONTENT === 'p2p' ? 'dist-e2e' : 'dist-e2e-do'
 
-/** Must match wrangler.e2e.jsonc: the client mints for this audience and issuer. */
+/** Must match wrangler.e2e.jsonc: the client mints for this audience. */
 const OIDC_CLIENT_ID = 'peerly-e2e-client'
-const OIDC_ISSUER = 'https://e2e.peerly.test'
+/**
+ * The harness's own origin, which serves the test JWKS (emit-e2e-jwks.mjs):
+ * the client fetches `<issuer>/.well-known/jwks.json` to verify the people it
+ * meets, and the page's CSP allows only its own origin for that.
+ */
+const OIDC_ISSUER = ORIGIN
 
 function runToCompletion(command, args, env) {
   const result = spawnSync(command, args, {
@@ -71,6 +76,7 @@ run('wrangler', 'npx', [
   '--ip', '127.0.0.1',
   '--var', `CONTENT_BACKEND:${CONTENT}`,
   '--var', `E2E_ALLOWED_ORIGIN:${ORIGIN}`,
+  '--var', `VITE_OIDC_ISSUER:${OIDC_ISSUER}`,
   '--var', `OIDC_JWKS_URL:${ORIGIN}/.well-known/jwks.json`,
   // Let the OS pick, so a stale inspector from a previous run cannot wedge
   // the whole suite on a port collision.

@@ -26,7 +26,7 @@
     // none of these resolves the provider to `null` and the route 503s, so
     // test-only auth stays configuration rather than a code branch.
     "VITE_OIDC_CLIENT_ID": "peerly-e2e-client",
-    "VITE_OIDC_ISSUER": "https://e2e.peerly.test",
+    "VITE_OIDC_ISSUER": "http://127.0.0.1:17273",
     "OIDC_JWKS_URL": "http://127.0.0.1:17273/.well-known/jwks.json"
 
     // No TURN key: two Chromium contexts on one host connect over host
