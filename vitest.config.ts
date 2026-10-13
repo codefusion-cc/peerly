@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'url'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import { buildDefines } from './build-info.mjs'
 
 export default defineConfig({
@@ -17,7 +17,12 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Inlined so the `cloudflare:workers` alias above reaches the package's
+    // own import of it (worker/console/consoleAdmin.mjs).
+    server: { deps: { inline: ['@codefusion-cc/console'] } },
     include: ['src/**/*.test.{ts,tsx}', 'packages/core/src/**/*.test.ts', 'worker/**/*.test.mjs'],
+    // npm run test:workers runs these in workerd.
+    exclude: [...configDefaults.exclude, '**/*.workers.test.*'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],

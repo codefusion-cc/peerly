@@ -5,6 +5,7 @@ import type { Connect } from 'vite'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { versionFile } from '@codefusion-cc/console/vite'
 import { buildDefines } from './build-info.mjs'
 
 function relayPortPlugin() {
@@ -89,7 +90,8 @@ function e2eRendezvousPlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), relayPortPlugin(), e2eRendezvousPlugin()],
+  // versionFile: /version.json, the deployed commit on CodeFusion Console's Deployments page.
+  plugins: [react(), tailwindcss(), relayPortPlugin(), e2eRendezvousPlugin(), versionFile()],
   define: buildDefines(),
   resolve: {
     dedupe: ['@trystero-p2p/core'],

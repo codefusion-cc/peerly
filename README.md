@@ -278,6 +278,16 @@ One-time setup:
 4. Set `VITE_GOOGLE_AUTH_BRIDGE_ORIGIN` and `VITE_GOOGLE_CLIENT_ID` for
    Cloudflare preview builds.
 
+### CodeFusion Console
+
+Both Workers report to [CodeFusion Console](https://console.codefusion.cc) as the app `peerly`: it reads every invocation as their tail consumer (Failures, Health, Logs), and each build serves `/version.json` with its version and commit (Deployments). The console reaches the production Worker through its `ConsoleAdmin` entrypoint ([`worker/console/`](worker/console)), a service binding with no public address. Its manifest lists the Worker secrets Peerly needs and how each value is made: random keys, and a Cloudflare Realtime TURN key for `TURN_KEY_ID` and `TURN_KEY_API_TOKEN`. The console's Secrets page shows which are missing in production and staging and makes new values, never showing one; from a shell:
+
+```bash
+codefusion-console secrets peerly
+```
+
+`codefusion-console provision_secrets peerly staging cloudflare-turn-key` creates a TURN key and writes both TURN secrets of `peerly-preview` once the owner approves it on Dispatch.
+
 ### Other hosts
 
 Vercel, Netlify, S3 + CloudFront, etc. work the same way: `npm run build`, publish `dist/`, set `VITE_*` env vars at build time, register OAuth origins.

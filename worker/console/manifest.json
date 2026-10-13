@@ -1,0 +1,38 @@
+{
+  "$schema": "../../node_modules/@codefusion-cc/console/app-manifest.schema.json",
+  "manifestVersion": 1,
+  "app": { "id": "peerly", "name": "Peerly" },
+  "resources": [],
+  "secrets": [
+    {
+      "name": "NETWORK_SESSION_SECRET",
+      "label": "Session signing key",
+      "description": "Signs device sessions and their cookies. A new one signs every device out until it signs in again. To rotate without that, set it by hand to new:old.",
+      "source": { "kind": "random", "bytes": 32 }
+    },
+    {
+      "name": "OPAQUE_USER_ID_SECRET",
+      "label": "Account id key",
+      "description": "Turns each sign-in into the account id the Durable Objects store everything under. Make one only where it is missing: a new one gives every account a new id, cut off from its devices and workspaces on the server.",
+      "source": { "kind": "random", "bytes": 32 }
+    },
+    {
+      "name": "RENDEZVOUS_SECRET",
+      "label": "Discovery key",
+      "description": "Makes the ids friends find each other by and signs lobby certificates. A new one changes every discovery id, and open tabs need a reload.",
+      "source": { "kind": "random", "bytes": 32 }
+    },
+    {
+      "name": "TURN_KEY_ID",
+      "label": "TURN key id",
+      "description": "Cloudflare Realtime TURN key, which relays calls and file transfers that cannot connect directly.",
+      "source": { "kind": "provider", "resource": "cloudflare-turn-key", "part": "id" }
+    },
+    {
+      "name": "TURN_KEY_API_TOKEN",
+      "label": "TURN key token",
+      "description": "The same TURN key's token, which the Worker gives short-lived TURN credentials with.",
+      "source": { "kind": "provider", "resource": "cloudflare-turn-key", "part": "token" }
+    }
+  ]
+}
