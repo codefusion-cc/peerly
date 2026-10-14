@@ -90,6 +90,19 @@ describe('Peerly durable content authorization', () => {
     ).rejects.toThrow('workspace membership is required')
   })
 
+  it('admits a listed member when another entry of the signed list is no address', async () => {
+    const { payload } = await workspacePolicy({ emails: ['alice@e2e.test', 'bob@@e2e.test'] })
+    const { handlers, authorize } = build()
+    await handlers['workspace.content.authorize'](workspaceContentAuthorizeCommand.validate(payload), {
+      identity: 'opaque-alice',
+      publicUserId: 'public-alice',
+      privateMemberId: await deriveMemberId(SECRET, 'peerly', 'alice@e2e.test'),
+      deviceKeyId: 'device-alice',
+    })
+    // The malformed entry admits nobody; the list itself still holds.
+    expect(authorize.mock.calls[0][0].authority.members).toEqual([await deriveMemberId(SECRET, 'peerly', 'alice@e2e.test')])
+  })
+
   it('initializes a DM authority from exactly the authenticated pair', async () => {
     const payload = dmContentAuthorizeCommand.validate({
       capability: 'a'.repeat(43),

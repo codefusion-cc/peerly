@@ -3,13 +3,25 @@ import { resolveOidcProvider, verifyOidcToken } from '../../packages/core/worker
 /** What `verifyOidcToken` throws when the provider's keys could not be read, rather than for a bad token. */
 const KEYS_UNAVAILABLE = new Set(['jwks unavailable', 'invalid jwks'])
 
-/** Fetches the provider's keys; a request that never got an answer counts as keys unavailable. */
+/**
+ * Fetches the provider's keys. A request that never got an answer, and an
+ * answer that is not JSON (an outage page), count as keys unavailable.
+ */
 async function fetchKeys(url, init) {
+  let response
   try {
-    return await fetch(url, init)
+    response = await fetch(url, init)
   } catch {
     throw new Error('jwks unavailable')
   }
+  if (!response.ok) return response
+  const text = await response.text()
+  try {
+    JSON.parse(text)
+  } catch {
+    throw new Error('jwks unavailable')
+  }
+  return new Response(text, response)
 }
 
 /**

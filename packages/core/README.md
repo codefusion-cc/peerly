@@ -14,9 +14,8 @@ rooms. MIT.
 
 ## Install
 
-```bash
-npm install @peerly/core
-```
+Not published any more: Peerly consumes it from source. The last release on npm
+is 1.16.0.
 
 `@trystero-p2p/supabase` and `react` are optional peer dependencies; install
 the ones your app actually uses. All signaling
@@ -135,8 +134,8 @@ Related helpers: `signalingLabel()`, `getNostrRelayConfig()`,
 `getSupabaseRoomConfig()`.
 
 `durable-objects` carries presence, directory and DM notifications and WebRTC
-signaling (`SignalScopeDO`); see [`worker/realtime`](worker/realtime),
-[`src/realtime`](src/realtime), and the
+signaling (`SignalScopeDO`, [`worker/realtime/gateway`](worker/realtime/gateway)); see
+[`src/realtime`](src/realtime) and the
 [Durable Objects architecture doc](https://github.com/codefusion-cc/peerly/blob/main/docs/DURABLE_OBJECTS_ARCHITECTURE.md).
 When a Durable Object restarts, for example on a deploy, a room's scope socket
 reopens by itself after 1, 2, 5 and 10 seconds, then every 30 seconds, with
@@ -323,23 +322,11 @@ relationship-aware peer descriptor plus category, count, and byte estimate;
 the bounded in-memory log intentionally has no payload-content field and is
 never persisted.
 
-## Publishing (maintainers)
+## Publishing
 
-Releases go through the `release-core.yml` GitHub Actions workflow (manual
-trigger): it lints and tests the repo, bumps **peerly** and **@peerly/core** in
-lockstep (patch/minor/major), publishes with npm **Trusted Publishing**, then
-opens a **release PR** (main is protected — no direct push) and pushes
-`core-v*` / `v*` tags. Merge the PR so `main` matches npm.
-
-| Input | Real release example |
-|-------|----------------------|
-| `dry_run` | **`false`** (default is `true` — dry-run only) |
-| `bump` | `patch`, **`minor`** (e.g. 1.0.0 → 1.1.0), or `major` |
-
-Dry-run still applies the bump in the runner workspace so the tarball is a
-*new* version (re-publishing an existing version fails). For a local sanity
-check: `cd packages/core && npm run build && npm pack --dry-run` (`prepack`
-builds automatically).
+`@peerly/core` is no longer published (`"private": true`). Its parts move to
+`@codefusion-cc/*` packages one by one; the Worker's control plane already runs
+on `@codefusion-cc/realtime`.
 
 ## Shared messaging and identity
 
@@ -355,7 +342,6 @@ supply storage names, signed wire types, UI text, and product authorization rule
 | `createTextChatHistoryStore(config)` | Shared history merge/load/save. `save` returns `boolean`; a failed write remains readable in this process for retry/export. It does not survive closing the page. |
 | `createIdentityClient()` | Obtain and verify short-lived, origin-bound account/device certificates without disclosing an OIDC token to other clients. |
 | `createIdentityRoutes(options)` from `/worker/identity` | Verify the provider token and device proof; issue/verify a minimal certificate. Configure a secret and rate limiter. |
-| `UserGatewayDO.validateChannelSession({sid, dk})` | One authoritative session-validity decision for both applications' channel adapters. |
 
 The identity Worker is an identity authority: applications trust it to attest an
 account/device binding. HMACs are scoped to the protocol and origin. Certificates

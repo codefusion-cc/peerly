@@ -16,6 +16,7 @@ import worker from '../index.mjs'
 const ORIGIN = 'https://peerly.cc'
 let accounts
 let keysReachable
+let keysAnswer
 
 const deployment = (extra = {}) => ({ ...env, ...accounts.env, CONTENT_BACKEND: 'p2p', ...extra })
 const call = (request, environment = deployment()) => worker.fetch(request, environment, {})
@@ -28,11 +29,12 @@ beforeAll(async () => {
 
 function fakeIdentityProvider() {
   keysReachable = true
+  keysAnswer = () => accounts.jwks()
   vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
     const url = input instanceof Request ? input.url : String(input)
     if (url !== accounts.jwksUrl) throw new Error(`Unexpected outbound request: ${url}`)
     if (!keysReachable) throw new TypeError('Network connection lost.')
-    return accounts.jwks()
+    return keysAnswer()
   })
 }
 
@@ -99,6 +101,15 @@ describe('signing in', () => {
     const response = await enroll(device, token)
     expect(response.status).toBe(503)
     expect(response.headers.get('retry-after')).toBe('30')
+  })
+
+  it('treats a key answer that is not JSON as an outage too', async () => {
+    fakeIdentityProvider()
+    clearOidcJwksCache()
+    keysAnswer = () => new Response('<html>Service unavailable</html>', { status: 200, headers: { 'content-type': 'text/html' } })
+    const device = await accounts.createDevice()
+    const token = await accounts.mintIdToken({ email: 'outage-html@e2e.test', nonce: device.deviceKeyId, subject: 'sub-outage-html' })
+    expect((await enroll(device, token)).status).toBe(503)
   })
 
   it('has no oidc provider where VITE_OIDC_* is unset', async () => {

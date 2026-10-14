@@ -67,6 +67,8 @@ describe('deployment profiles', () => {
       expect(limit('AUTH_RATE_LIMITER')).toEqual({ limit: LIMITS.authRequestsPerMinute, period: 60 })
       expect(limit('AUTH_IP_RATE_LIMITER')).toEqual({ limit: LIMITS.authRequestsPerMinutePerIp, period: 60 })
       expect(limit('IDENTITY_RATE_LIMITER')).toEqual({ limit: 30, period: 60 })
+      // All of an account's devices and tabs reconnect at once after a deploy.
+      expect(limit('SESSION_ACCOUNT_RATE_LIMITER')).toEqual({ limit: 60, period: 60 })
     })
   }
 
