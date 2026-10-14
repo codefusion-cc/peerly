@@ -30,7 +30,7 @@ export function allowedAuthParent(origin) {
       // both are staging names on our own zone. See the matching comment in
       // HeyHubs' worker/index.mjs.
       /^[a-z0-9-]+-preview\.peerly\.cc$/i.test(url.hostname) ||
-      /^[a-z0-9-]+-peerly\.codefusion\.workers?\.dev$/i.test(url.hostname)
+      /^[a-z0-9-]+-peerly\.codefusion\.workers\.dev$/i.test(url.hostname)
     )
   } catch {
     return false

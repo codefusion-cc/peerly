@@ -98,7 +98,7 @@ describe('signing in', () => {
     expect(toGoogle.searchParams.get('hl')).toBe('pl')
     expect(toGoogle.searchParams.get('nonce')?.startsWith(`${DEVICE}.`)).toBe(true)
 
-    await throughGoogle(tab, { claims: { email: 'ada@example.com' } })
+    await throughGoogle(tab, { claims: { email: 'ada@example.com', name: 'Ada Lovelace' } })
     expect(new URL(tab.href).pathname).toBe('/login')
 
     const back = await page()
@@ -107,6 +107,8 @@ describe('signing in', () => {
     expect(back.hasGoogleReturn()).toBe(true)
     const credential = await back.finishGoogleReturn(DEVICE)
     expect(credential?.email).toBe('ada@example.com')
+    // The first workspace joined uses it as the person's name.
+    expect(credential?.name).toBe('Ada Lovelace')
     expect(back.takeGoogleNotice('sign-in')).toBeNull()
     // Taken once: a second look finds nothing.
     expect(await back.finishGoogleReturn(DEVICE)).toBeNull()
@@ -217,41 +219,59 @@ describe('the quiet refresh', () => {
     const iat = Math.floor((Date.now() - ms) / 1000)
     return google.token({ nonce: deviceSignInNonce(DEVICE), iat, exp: iat + 3600 })
   }
-  const due = async (redirect: Awaited<ReturnType<typeof page>>, token: string | null, overrides: Partial<{ providerId: string | null; email: string | null }> = {}) =>
-    redirect.shouldRefreshGoogle({ token, providerId: 'google', email: 'ada@example.com', deviceKeyId: DEVICE, ...overrides })
+  const due = (redirect: Awaited<ReturnType<typeof page>>, token: string | null, overrides: Partial<{ providerId: string | null; email: string | null; now: number }> = {}) =>
+    redirect.shouldRefreshGoogle({ token, providerId: 'google', email: 'ada@example.com', ...overrides })
 
   it('leaves a token alone for its first three days, then refreshes it', async () => {
     fakeTab('/')
     const redirect = await page()
-    expect(await due(redirect, await tokenAged(2 * DAY))).toBe(false)
-    expect(await due(redirect, await tokenAged(redirect.REFRESH_AFTER_MS - 60_000))).toBe(false)
-    expect(await due(redirect, await tokenAged(redirect.REFRESH_AFTER_MS + 60_000))).toBe(true)
-    expect(await due(redirect, null)).toBe(true)
+    expect(due(redirect, await tokenAged(2 * DAY))).toBe(false)
+    expect(due(redirect, await tokenAged(redirect.REFRESH_AFTER_MS - 60_000))).toBe(false)
+    expect(due(redirect, await tokenAged(redirect.REFRESH_AFTER_MS + 60_000))).toBe(true)
+    expect(due(redirect, null)).toBe(true)
   })
 
-  it('refreshes a young token whose key Google withdrew', async () => {
+  it('refreshes at the next load a young token found unusable in the tab: its key withdrawn, or another device key', async () => {
     fakeTab('/')
     const redirect = await page()
     const token = await tokenAged(DAY)
-    expect(await due(redirect, token)).toBe(false)
+    expect(await redirect.checkOwnGoogleToken({ token, deviceKeyId: DEVICE })).toBe('ok')
+    expect(due(redirect, token)).toBe(false)
     await google.rotate({ keepPrevious: false })
-    // A page load after the keys this device read went stale (five minutes) reads them afresh.
+    // A check after the keys this device read went stale (five minutes) reads them afresh.
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 6 * 60_000 })
     try {
-      expect(await due(await page(), token)).toBe(true)
+      expect(await (await page()).checkOwnGoogleToken({ token, deviceKeyId: DEVICE })).toBe('unusable')
     } finally {
       vi.useRealTimers()
     }
+    const next = await page()
+    expect(due(next, token)).toBe(true)
+    // A newer token is not taken for the one found unusable.
+    expect(due(next, await tokenAged(DAY / 2))).toBe(false)
+
+    const keysCleared = await tokenAged(DAY)
+    const later = await page()
+    expect(await later.checkOwnGoogleToken({ token: keysCleared, deviceKeyId: OTHER_DEVICE })).toBe('unusable')
+  })
+
+  it('says nothing about a token while Google’s keys cannot be read', async () => {
+    fakeTab('/')
+    const redirect = await page()
+    google.answerKeys('network')
+    const token = await tokenAged(DAY)
+    expect(await redirect.checkOwnGoogleToken({ token, deviceKeyId: DEVICE })).toBe('unknown')
+    expect(due(redirect, token)).toBe(false)
   })
 
   it('never for another provider, an account it does not remember, or offline', async () => {
     const tab = fakeTab('/')
     const redirect = await page()
     const old = await tokenAged(10 * DAY)
-    expect(await due(redirect, old, { providerId: 'microsoft' })).toBe(false)
-    expect(await due(redirect, old, { email: null })).toBe(false)
+    expect(due(redirect, old, { providerId: 'microsoft' })).toBe(false)
+    expect(due(redirect, old, { email: null })).toBe(false)
     tab.online = false
-    expect(await due(redirect, old)).toBe(false)
+    expect(due(redirect, old)).toBe(false)
   })
 
   it('tries at most once a day, recording the try before leaving, without a prompt', async () => {
@@ -264,8 +284,8 @@ describe('the quiet refresh', () => {
     expect(toGoogle.searchParams.get('prompt')).toBe('none')
     expect(toGoogle.searchParams.get('login_hint')).toBe('ada@example.com')
     // The return never came (the person closed the tab, Google hung): the next loads that day stay put.
-    expect(await redirect.shouldRefreshGoogle({ token: old, providerId: 'google', email: 'ada@example.com', deviceKeyId: DEVICE, now: now + redirect.REFRESH_EVERY_MS - 1 })).toBe(false)
-    expect(await redirect.shouldRefreshGoogle({ token: old, providerId: 'google', email: 'ada@example.com', deviceKeyId: DEVICE, now: now + redirect.REFRESH_EVERY_MS })).toBe(true)
+    expect(due(redirect, old, { now: now + redirect.REFRESH_EVERY_MS - 1 })).toBe(false)
+    expect(due(redirect, old, { now: now + redirect.REFRESH_EVERY_MS })).toBe(true)
   })
 
   it('never without storage to remember the try in', async () => {
@@ -273,7 +293,7 @@ describe('the quiet refresh', () => {
     tab.localStorage.getItem = () => { throw new DOMException('blocked', 'SecurityError') }
     tab.localStorage.setItem = () => { throw new DOMException('blocked', 'SecurityError') }
     const redirect = await page()
-    expect(await due(redirect, null)).toBe(false)
+    expect(due(redirect, null)).toBe(false)
     expect(redirect.refreshGoogleQuietly({ deviceKeyId: DEVICE, email: 'ada@example.com' })).toBe(false)
     expect(tab.assigned).toEqual([])
   })
@@ -333,12 +353,34 @@ describe('a page load', () => {
 
   it('leaves quietly with an aging token, and stays with a young one', async () => {
     const tab = fakeTab('/workspace/abc')
-    const redirect = await page()
-    expect((await redirect.settleGoogleAtLoad({ deviceKeyId: DEVICE, ...await stored(DAY) })).kind).toBe('stay')
+    expect((await (await page()).settleGoogleAtLoad({ deviceKeyId: DEVICE, ...await stored(DAY) })).kind).toBe('stay')
     expect(tab.assigned).toEqual([])
-    expect((await redirect.settleGoogleAtLoad({ deviceKeyId: DEVICE, ...await stored(4 * DAY) })).kind).toBe('leaving')
+    expect((await (await page()).settleGoogleAtLoad({ deviceKeyId: DEVICE, ...await stored(4 * DAY) })).kind).toBe('leaving')
     expect(new URL(tab.assigned[0]).searchParams.get('prompt')).toBe('none')
     // The next load that day, its return lost: it stays.
     expect((await (await page()).settleGoogleAtLoad({ deviceKeyId: DEVICE, ...await stored(4 * DAY) })).kind).toBe('stay')
+  })
+
+  it('never waits on Google’s keys before the first render', async () => {
+    const tab = fakeTab('/')
+    google.answerKeys('hang')
+    const started = Date.now()
+    expect((await (await page()).settleGoogleAtLoad({ deviceKeyId: DEVICE, ...await stored(DAY) })).kind).toBe('stay')
+    expect(Date.now() - started).toBeLessThan(500)
+    expect(tab.assigned).toEqual([])
+  })
+
+  it('settles once per load: StrictMode’s second run does not leave for Google after a renewal came back', async () => {
+    const tab = fakeTab('/workspace/abc')
+    const redirect = await page()
+    redirect.startGoogleRedirect({ deviceKeyId: DEVICE, purpose: 'renew', email: 'ada@example.com' })
+    await throughGoogle(tab, { claims: { email: 'ada@example.com' } })
+    const back = await page()
+    back.takeGoogleReturn()
+    const input = { deviceKeyId: DEVICE, token: null, providerId: 'google', email: 'ada@example.com' }
+    const [first, second] = await Promise.all([back.settleGoogleAtLoad(input), back.settleGoogleAtLoad(input)])
+    expect(first.kind).toBe('stored')
+    expect(second).toBe(first)
+    expect(tab.assigned).toHaveLength(1)
   })
 })

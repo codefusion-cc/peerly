@@ -18,8 +18,8 @@ import {
   takeGoogleSignInResult,
   type GoogleSignInResult,
 } from '@codefusion-cc/google-sign-in/browser'
-import { deviceSignInNonce, verifyDeviceIdToken } from './deviceToken'
-import { getIdentityProvider, providerKeys, type IdentityProvider } from '../collab/identityProviders'
+import { deviceSignInNonce } from './deviceToken'
+import { getIdentityProvider, verifyProviderToken } from '../collab/identityProviders'
 
 /** Why a sign-in leaves for Google: the login screen, the banner renewing it, or a quiet refresh at load. */
 export type GooglePurpose = 'sign-in' | 'renew' | 'refresh'
@@ -31,6 +31,8 @@ export const REFRESH_EVERY_MS = 24 * 60 * 60_000
 
 const RETURN_KEY = 'peerly-google-return'
 const REFRESH_AT_KEY = 'peerly-google-refresh-at'
+/** The `iat` of a Google token `checkOwnGoogleToken` found nobody can verify any more. */
+const UNUSABLE_KEY = 'peerly-google-unusable'
 
 type ReturnRecord = { path: string; hash: string; purpose: GooglePurpose; email?: string }
 
@@ -47,10 +49,6 @@ const isPurpose = (value: unknown): value is GooglePurpose => value === 'sign-in
 const isLocalPath = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\')
 
-function googleProvider(): IdentityProvider | null {
-  return getIdentityProvider('google') ?? null
-}
-
 /**
  * Leaves for Google. False, and stays, when Google is not configured or this tab keeps no session storage (the
  * return could not be matched to this sign-in): the caller says sign-in needs storage.
@@ -62,7 +60,7 @@ export function startGoogleRedirect(input: {
   email?: string
   locale?: string
 }): boolean {
-  const provider = googleProvider()
+  const provider = getIdentityProvider('google')
   if (!provider) return false
   const record: ReturnRecord = {
     path: `${location.pathname}${location.search}`,
@@ -145,7 +143,7 @@ export function googleNoticeText(notice: GoogleNotice, tr: (english: string, val
 }
 
 /** A checked token from Google, for the session to store. */
-export type GoogleCredential = { token: string; email: string; iss: string; sub: string; picture?: string }
+export type GoogleCredential = { token: string; email: string; iss: string; sub: string; name?: string; picture?: string }
 
 /**
  * Checks the token this load came back with: Google's, bound to this device by this sign-in's own nonce, for the
@@ -165,14 +163,9 @@ export async function finishGoogleReturn(deviceKeyId: string): Promise<GoogleCre
     if (result.error === 'cancelled') return null
     return tell({ code: result.error === 'expired' ? 'expired' : 'failed' })
   }
-  const provider = googleProvider()
+  const provider = getIdentityProvider('google')
   if (!provider) return tell({ code: 'unconfigured' })
-  const check = await verifyDeviceIdToken(result.credential, {
-    keys: providerKeys(provider),
-    issuers: provider.issuers ?? [],
-    audience: provider.clientId,
-    deviceKeyId,
-  })
+  const check = await verifyProviderToken(result.credential, provider, deviceKeyId)
   if (!check.ok) return tell({ code: check.problem === 'keys-unavailable' ? 'offline' : 'failed' })
   // Only this sign-in's nonce: a token from an earlier sign-in of this device is not this sign-in's answer.
   if (check.claims.nonce !== result.nonce) return tell({ code: 'failed' })
@@ -184,38 +177,64 @@ export async function finishGoogleReturn(deviceKeyId: string): Promise<GoogleCre
     email: check.claims.email,
     iss: check.claims.iss,
     sub: check.claims.sub,
+    ...(check.claims.name ? { name: check.claims.name } : {}),
     ...(check.claims.picture ? { picture: check.claims.picture } : {}),
   }
 }
 
 /**
- * Whether this page load should refresh a Google token quietly: one that is over `REFRESH_AFTER_MS` old, gone (past
- * its 30 days), or under a key Google withdrew, for an account the device remembers; never right after a return
- * from Google, offline, or within `REFRESH_EVERY_MS` of the last try.
+ * Whether this page load should refresh a Google token quietly: one over `REFRESH_AFTER_MS` old, gone (past its 30
+ * days), or found unusable since (`checkOwnGoogleToken`), for an account the device remembers; never offline or within
+ * `REFRESH_EVERY_MS` of the last try. Decided from what the device holds, without the network, so the first render
+ * never waits on Google.
  */
-export async function shouldRefreshGoogle(input: {
+export function shouldRefreshGoogle(input: {
   token: string | null
   providerId: string | null
   email: string | null
-  deviceKeyId: string
   now?: number
-}): Promise<boolean> {
+}): boolean {
   const now = input.now ?? Date.now()
-  const provider = googleProvider()
-  if (!provider || input.providerId !== 'google' || !input.email) return false
+  if (!getIdentityProvider('google') || input.providerId !== 'google' || !input.email) return false
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return false
   if (now - lastRefreshAt() < REFRESH_EVERY_MS) return false
   if (!input.token) return true
   const iat = readIdTokenClaims(input.token)?.iat
   if (typeof iat !== 'number' || now - iat * 1000 >= REFRESH_AFTER_MS) return true
-  const check = await verifyDeviceIdToken(input.token, {
-    keys: providerKeys(provider),
-    issuers: provider.issuers ?? [],
-    audience: provider.clientId,
-    deviceKeyId: input.deviceKeyId,
-    now,
-  })
-  return !check.ok && check.problem === 'unknown-key'
+  return readStored(UNUSABLE_KEY) === String(iat)
+}
+
+/**
+ * Checks this device's own Google token as its peers do, once the page is up. One nobody can verify any more (Google
+ * withdrew its key) or that names another device key (the device's keys were cleared) is `unusable`: the person is
+ * told, and the next page load refreshes it quietly. `unknown` when Google's keys could not be read.
+ */
+export async function checkOwnGoogleToken(input: { token: string; deviceKeyId: string; now?: number }): Promise<'ok' | 'unusable' | 'unknown'> {
+  const provider = getIdentityProvider('google')
+  if (!provider) return 'unknown'
+  const check = await verifyProviderToken(input.token, provider, input.deviceKeyId, input.now)
+  if (check.ok) return 'ok'
+  if (check.problem === 'keys-unavailable') return 'unknown'
+  const iat = readIdTokenClaims(input.token)?.iat
+  if (typeof iat === 'number') writeStored(UNUSABLE_KEY, String(iat))
+  return 'unusable'
+}
+
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writeStored(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function lastRefreshAt(): number {
@@ -230,11 +249,7 @@ function lastRefreshAt(): number {
 
 /** Leaves for Google without a prompt, recording the try first so a return that never comes cannot loop. */
 export function refreshGoogleQuietly(input: { deviceKeyId: string; email: string; now?: number }): boolean {
-  try {
-    localStorage.setItem(REFRESH_AT_KEY, String(input.now ?? Date.now()))
-  } catch {
-    return false
-  }
+  if (!writeStored(REFRESH_AT_KEY, String(input.now ?? Date.now()))) return false
   return startGoogleRedirect({ deviceKeyId: input.deviceKeyId, purpose: 'refresh', email: input.email })
 }
 
@@ -243,18 +258,27 @@ export function refreshGoogleQuietly(input: { deviceKeyId: string; email: string
  * refresh an aging one quietly (`shouldRefreshGoogle`), or nothing. Never both, so a return that stored nothing
  * cannot send the page straight back to Google. At load nothing is under way yet (no call, no upload).
  */
-export async function settleGoogleAtLoad(input: {
+export function settleGoogleAtLoad(input: {
   deviceKeyId: string
   token: string | null
   providerId: string | null
   email: string | null
-}): Promise<{ kind: 'stored'; credential: GoogleCredential } | { kind: 'leaving' } | { kind: 'stay' }> {
+}): Promise<LoadSettled> {
+  // Once per page load: React's StrictMode runs the bootstrap twice, and the second run must not see "no return"
+  // and leave for Google again.
+  return settling ??= settle(input)
+}
+
+type LoadSettled = { kind: 'stored'; credential: GoogleCredential } | { kind: 'leaving' } | { kind: 'stay' }
+let settling: Promise<LoadSettled> | null = null
+
+async function settle(input: Parameters<typeof settleGoogleAtLoad>[0]): Promise<LoadSettled> {
   if (hasGoogleReturn()) {
     const credential = await finishGoogleReturn(input.deviceKeyId)
     return credential ? { kind: 'stored', credential } : { kind: 'stay' }
   }
   const { email } = input
-  if (email && await shouldRefreshGoogle(input) && refreshGoogleQuietly({ deviceKeyId: input.deviceKeyId, email })) {
+  if (email && shouldRefreshGoogle(input) && refreshGoogleQuietly({ deviceKeyId: input.deviceKeyId, email })) {
     return { kind: 'leaving' }
   }
   return { kind: 'stay' }

@@ -414,6 +414,9 @@ const plByEnglish: Record<string, string> = {
     'Twoje logowanie wygaśnie w ciągu doby. Zaloguj się ponownie, aby dalej przyjmować nowe połączenia.',
   'Sign in again': 'Zaloguj się ponownie',
   'Opening Google': 'Otwieranie Google',
+  'Sign in anyway': 'Zaloguj się mimo to',
+  'Signing in again reloads Peerly and ends your call.': 'Ponowne logowanie przeładuje Peerly i zakończy rozmowę.',
+  'Signing in again reloads Peerly and stops your file transfers.': 'Ponowne logowanie przeładuje Peerly i przerwie przesyłanie plików.',
   'Signing in needs this site’s storage. Allow site data for Peerly in your browser and try again.':
     'Logowanie wymaga pamięci tej strony. Zezwól Peerly na zapisywanie danych w przeglądarce i spróbuj ponownie.',
   'That sign-in took too long or started in another tab. Try again.':

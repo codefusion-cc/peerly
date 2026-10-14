@@ -7,6 +7,7 @@ import { deriveUserId } from '../collab/userId'
 import type { WorkspaceAuthManager } from '../collab/workspaceAuth'
 import { saveIdCredentials, type Session } from '../session'
 import { useI18n } from '../i18n'
+import { useChatSlice, useMediaSlice } from '../context/useCollabSlices'
 
 type Props = {
   phase: IdentityExpiryPhase
@@ -32,6 +33,15 @@ export function ReauthBanner({ phase, session, authManager, onReauthed }: Props)
   const [error, setError] = useState<string | null>(null)
   const e2e = isE2eAuthBypass()
   const provider = session.identityProvider
+  // Google's sign-in leaves the page: what it would end is said before it goes.
+  const { inCall } = useMediaSlice()
+  const { transfers } = useChatSlice()
+  const leaves = provider === 'google' && !e2e
+  const wouldEnd = !leaves ? null : inCall ? 'call' : transfers.length > 0 ? 'transfer' : null
+  const [warned, setWarned] = useState(false)
+  useEffect(() => {
+    if (!wouldEnd) setWarned(false)
+  }, [wouldEnd])
 
   // What came of a renewal at Google that stored nothing.
   useEffect(() => {
@@ -71,6 +81,10 @@ export function ReauthBanner({ phase, session, authManager, onReauthed }: Props)
 
   const handleReauth = async () => {
     setError(null)
+    if (wouldEnd && !warned) {
+      setWarned(true)
+      return
+    }
     setBusy(true)
     try {
       if (!authManager) throw new Error(tr('Still connecting — try again in a moment'))
@@ -118,8 +132,15 @@ export function ReauthBanner({ phase, session, authManager, onReauthed }: Props)
         disabled={busy}
         data-testid="reauth-button"
       >
-        {busy ? `${tr('Signing in')}…` : tr('Sign in again')}
+        {busy ? `${tr('Signing in')}…` : wouldEnd && warned ? tr('Sign in anyway') : tr('Sign in again')}
       </button>
+      {wouldEnd && warned && !busy && (
+        <span className="basis-full text-xs">
+          {wouldEnd === 'call'
+            ? tr('Signing in again reloads Peerly and ends your call.')
+            : tr('Signing in again reloads Peerly and stops your file transfers.')}
+        </span>
+      )}
       {error && <span className="basis-full text-xs">{error}</span>}
     </div>
   )

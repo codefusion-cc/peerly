@@ -96,6 +96,7 @@ jobs:
         working-directory: packages/core
         run: |
           npm run build
+          node scripts/check-self-contained.mjs
           npm pack --dry-run
           if [ "${{ steps.flags.outputs.dry_run }}" = "true" ]; then
             echo "Dry run — not publishing to the registry."

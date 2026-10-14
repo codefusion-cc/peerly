@@ -1,15 +1,18 @@
 import { DEVICE_TOKEN_MAX_AGE_MS } from './auth/deviceToken'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  clearIdCredentials,
   createSessionFromInvite,
   leaveWorkspace,
   loadIdentityEmail,
+  loadIdentityName,
   loadIdentityProvider,
   loadIdToken,
   loadPersistedSession,
   loadSession,
   migrateSessionWorkspaceRouteId,
   saveIdCredentials,
+  saveIdentityName,
   saveSession,
 } from './session'
 import { utf8ToBase64Url } from './utils/base64url'
@@ -175,5 +178,15 @@ describe('stored ID token lifetime', () => {
     // Not all issuers are JWT-shaped; absence of a readable iat is not evidence of age, and peers still enforce it.
     saveIdCredentials('not-a-jwt', 'google', 'alice@example.com')
     expect(loadIdToken()).toBe('not-a-jwt')
+  })
+})
+
+describe('the provider’s display name', () => {
+  it('is kept beside the identity and goes with it at sign-out', () => {
+    saveIdCredentials('token', 'google', 'ada@example.com')
+    saveIdentityName('Ada Lovelace')
+    expect(loadIdentityName()).toBe('Ada Lovelace')
+    clearIdCredentials()
+    expect(loadIdentityName()).toBeNull()
   })
 })

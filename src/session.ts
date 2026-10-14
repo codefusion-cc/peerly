@@ -65,6 +65,8 @@ const ID_TOKEN_KEY = 'peerly-id-token'
 const ID_USER_ID_KEY = 'peerly-id-user-id'
 const ID_PROVIDER_KEY = 'peerly-id-provider'
 const ID_EMAIL_KEY = 'peerly-id-email'
+/** The provider's display name for the account, the default name in a workspace joined next. */
+const ID_NAME_KEY = 'peerly-id-name'
 
 /** Read identity metadata from localStorage, migrating any pre-split value. */
 function readIdentityValue(key: string): string | null {
@@ -203,6 +205,16 @@ export function saveIdCredentials(
   }
 }
 
+/** The display name the provider gave for the signed-in account, kept for the next workspace's default name. */
+export function saveIdentityName(name: string | undefined): void {
+  if (name) localStorage.setItem(ID_NAME_KEY, name)
+  else localStorage.removeItem(ID_NAME_KEY)
+}
+
+export function loadIdentityName(): string | null {
+  return localStorage.getItem(ID_NAME_KEY)
+}
+
 export function loadIdentityUserId(): string | null {
   return readIdentityValue(ID_USER_ID_KEY)
 }
@@ -210,7 +222,7 @@ export function loadIdentityUserId(): string | null {
 /** Full sign-out: token AND identity metadata, from both storages. */
 export function clearIdCredentials(): void {
   clearIdToken()
-  for (const key of [ID_USER_ID_KEY, ID_PROVIDER_KEY, ID_EMAIL_KEY]) {
+  for (const key of [ID_USER_ID_KEY, ID_PROVIDER_KEY, ID_EMAIL_KEY, ID_NAME_KEY]) {
     sessionStorage.removeItem(key)
     localStorage.removeItem(key)
   }

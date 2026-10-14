@@ -117,7 +117,8 @@ describe('Peerly sign-in origins and Google’s return', () => {
     expect(allowedAuthParent('https://peerly.cc')).toBe(true)
     expect(allowedAuthParent('https://preview.peerly.cc')).toBe(true)
     expect(allowedAuthParent('https://fix-auth-peerly.codefusion.workers.dev')).toBe(true)
-    expect(allowedAuthParent('https://fix-auth-peerly.codefusion.worker.dev')).toBe(true)
+    // worker.dev is not Cloudflare's: someone else owns it, and a sign-in must never hand them a token.
+    expect(allowedAuthParent('https://fix-auth-peerly.codefusion.worker.dev')).toBe(false)
     expect(allowedAuthParent('http://fix-auth-peerly.codefusion.workers.dev')).toBe(false)
     expect(allowedAuthParent('https://fix-auth-peerly.codefusion.workers.dev/path')).toBe(false)
     expect(allowedAuthParent('https://fix-auth-peerly.codefusion.workers.dev.evil.test')).toBe(false)
@@ -158,6 +159,7 @@ describe('Peerly sign-in origins and Google’s return', () => {
     expect(new URLSearchParams(location.hash.slice(1)).get('google_id_token')).toBe('aaa.bbb.ccc')
 
     expect((await handOff(signInState('https://evil.test', '/login'))).status).toBe(400)
+    expect((await handOff(signInState('https://x-peerly.codefusion.worker.dev', '/login'))).status).toBe(400)
     expect((await handOff(signInState('https://peerly.cc', '/workspace/x'))).status).toBe(400)
     expect((await handOff(signInState('https://peerly.cc', '/login'), { site: 'cross-site' })).status).toBe(403)
   })

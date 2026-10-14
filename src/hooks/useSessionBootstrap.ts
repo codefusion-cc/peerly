@@ -13,6 +13,7 @@ import {
   migrateLegacySession,
   migrateSessionWorkspaceRouteId,
   saveIdCredentials,
+  saveIdentityName,
   saveSession,
   type Session,
 } from '../session'
@@ -38,6 +39,7 @@ async function settleGoogleSignIn(): Promise<boolean> {
     const { credential } = settled
     await ensureOidcAvatar(credential.picture)
     saveIdCredentials(credential.token, 'google', credential.email, await deriveUserId(credential.iss, credential.sub))
+    saveIdentityName(credential.name)
   }
   return settled.kind === 'leaving'
 }
@@ -102,7 +104,12 @@ export function useSessionBootstrap(): SessionBootstrap {
       await migrateLegacySession()
       await migrateSessionWorkspaceRouteId()
       await migrateWorkspaceRouteIds()
-      if (await settleGoogleSignIn()) return
+      if (await settleGoogleSignIn()) {
+        // Back from Google by the Back button, this load comes out of the back-forward cache never having rendered:
+        // load it again (the try is recorded, so it does not leave a second time).
+        window.addEventListener('pageshow', event => { if (event.persisted) location.reload() }, { once: true })
+        return
+      }
 
       // A session without a live token is still a session: the user lands back
       // in their workspace and the ReauthBanner ('expired' phase) handles

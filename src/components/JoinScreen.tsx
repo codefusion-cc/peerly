@@ -18,6 +18,7 @@ import {
 import {
   loadIdToken,
   loadIdentityEmail,
+  loadIdentityName,
   loadIdentityUserId,
   loadIdentityProvider,
   loadPersistedSession,
@@ -74,7 +75,7 @@ function restoreSignedInIdentity(): SignedInIdentity | null {
   const providerId = loadIdentityProvider()
   const email = loadIdentityEmail()
   if (!token || !providerId || !email) return null
-  return { email, token, providerId, userId: loadIdentityUserId() ?? undefined }
+  return { email, token, providerId, userId: loadIdentityUserId() ?? undefined, name: loadIdentityName() ?? undefined }
 }
 
 export function JoinScreen({ view, pickerTab, onPickerTabChange, onJoined, onIdentityChange }: Props) {
