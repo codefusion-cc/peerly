@@ -71,7 +71,7 @@ it('a call holds the tab on its build and offers the newer one; ending it moves 
   expect(page.reloads).toBe(1)
 })
 
-it('Later hides the offer, and Refresh reloads at once even during a call', async () => {
+it('Later hides the offer on every screen until a newer build, and Refresh reloads at once even during a call', async () => {
   const reload = vi.fn()
   vi.stubGlobal('location', { ...window.location, reload })
   const { useUpdateHold, UpdateNotice, I18nProvider } = await freshDocument()
@@ -83,10 +83,15 @@ it('Later hides the offer, and Refresh reloads at once even during a call', asyn
   await deploy()
   fireEvent.click(screen.getByRole('button', { name: 'Later' }))
   expect(screen.queryByTestId('update-notice')).toBeNull()
-  view.unmount()
 
+  // Another screen mounts its own notice: the same build stays left for later.
+  view.unmount()
   render(<I18nProvider><Call /><UpdateNotice /></I18nProvider>)
-  await deploy()
+  await act(() => page.comeBack())
+  expect(screen.queryByTestId('update-notice')).toBeNull()
+
+  page.deployed = 'c'.repeat(40)
+  await act(() => page.comeBack())
   fireEvent.click(await screen.findByRole('button', { name: 'Refresh' }))
   expect(reload).toHaveBeenCalledTimes(1)
   vi.unstubAllGlobals()
@@ -100,18 +105,23 @@ it('a moving transfer holds the tab; one stalled for a minute lets it go', async
     useTransferHold([{ id: 'file-1', percent }])
     return null
   }
+  /** Time passes; a hold React let go of meanwhile lets the reload come on the next task. */
+  const elapse = async (ms: number) => {
+    await act(() => vi.advanceTimersByTimeAsync(ms))
+    await act(() => vi.advanceTimersByTimeAsync(0))
+  }
   const view = render(<Files percent={10} />)
   await deploy()
   expect(page.reloads).toBe(0)
 
   // Progress keeps it held past the first minute.
-  await act(() => vi.advanceTimersByTimeAsync(TRANSFER_STALL_MS - 1_000))
+  await elapse(TRANSFER_STALL_MS - 1_000)
   view.rerender(<Files percent={60} />)
-  await act(() => vi.advanceTimersByTimeAsync(TRANSFER_STALL_MS - 1_000))
+  await elapse(TRANSFER_STALL_MS - 1_000)
   expect(page.reloads).toBe(0)
 
   // Then nothing more arrives: the peer left.
-  await act(() => vi.advanceTimersByTimeAsync(1_000 + 30_000))
+  await elapse(1_000)
   expect(page.reloads).toBe(1)
 })
 

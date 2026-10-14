@@ -4,7 +4,7 @@
  * transfer (their hooks hold it), a changed field or a request that changes data. A tab whose scripts a deploy
  * removed reloads into the new build (lazyPage).
  */
-import { lazy, useEffect, type ComponentType } from 'react'
+import { lazy, useEffect, useState, type ComponentType } from 'react'
 import { watchAppUpdates } from '@codefusion-cc/app-update/browser'
 
 export const updates = watchAppUpdates({
@@ -27,15 +27,13 @@ export function useUpdateHold(active: boolean): void {
 /** Holds the reload while files move: from each step of progress until a minute without any. */
 export function useTransferHold(transfers: readonly { id: string; percent: number }[]): void {
   const progress = transfers.map(transfer => `${transfer.id}:${transfer.percent}`).join()
+  const [stalledAt, setStalledAt] = useState<string | null>(null)
   useEffect(() => {
     if (!progress) return undefined
-    const release = updates.hold()
-    const timer = setTimeout(release, TRANSFER_STALL_MS)
-    return () => {
-      clearTimeout(timer)
-      release()
-    }
+    const timer = setTimeout(() => setStalledAt(progress), TRANSFER_STALL_MS)
+    return () => clearTimeout(timer)
   }, [progress])
+  useUpdateHold(progress !== '' && progress !== stalledAt)
 }
 
 /**

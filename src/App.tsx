@@ -68,7 +68,7 @@ function AppContent() {
   const { route, navigate, pickerTab, workspaceRoute, enterWorkspace, leaveToPicker, setPickerTab, setWorkspaceRoute } =
     useAppRouting(session?.workspaceRouteId, signedIn, ready)
   // Fields changed on the last screen no longer hold a reload into a newer build.
-  useEffect(() => updates.navigated(), [route, workspaceRoute])
+  useEffect(() => updates.navigated(), [route])
   const [legalAccepted, setLegalAccepted] = useState(() => hasAcceptedCurrentLegal())
   const acceptLegal = () => {
     acceptCurrentLegal()
@@ -282,13 +282,52 @@ function AppContent() {
     await switchWorkspace(workspace)
   }
 
+  // One stack, so a notice never covers another.
+  const toasts = (
+    <div className="toast toast-end toast-top z-50">
+      <UpdateNotice />
+      {friendInviteNotice && (
+        <div className="alert alert-info shadow-lg" role="status" aria-live="polite" data-testid="friend-request-notification">
+          <span><strong>{friendInviteNotice.fromName}</strong> sent you a friend request.</span>
+          <button type="button" className="btn btn-sm" onClick={() => { navigate({ screen: 'home' }); setFriendInviteNotice(null) }}>Open</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFriendInviteNotice(null)}>Dismiss</button>
+        </div>
+      )}
+      {workspaceInviteNotice && (
+        <div className="alert alert-info shadow-lg" role="status" aria-live="polite" data-testid="workspace-invite-notification">
+          <span>
+            <strong>{workspaceInviteNotice.fromName}</strong>{' '}
+            invited you to <strong>{workspaceInviteNotice.payload.invite.workspaceName}</strong>.
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => void openWorkspaceInvitation(workspaceInviteNotice)}
+          >
+            Join
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => presence.dismissWorkspaceInvite(workspaceInviteNotice.inviteId)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+    </div>
+  )
+
   // Public legal pages render regardless of session/hydration state.
   if (route.screen === 'legal') {
     return (
-      <LegalPage
-        doc={route.doc}
-        onBack={() => navigate(session ? defaultWorkspaceRoute(session.workspaceRouteId) : signedIn ? { screen: 'home' } : { screen: 'login' })}
-      />
+      <>
+        <LegalPage
+          doc={route.doc}
+          onBack={() => navigate(session ? defaultWorkspaceRoute(session.workspaceRouteId) : signedIn ? { screen: 'home' } : { screen: 'login' })}
+        />
+        {toasts}
+      </>
     )
   }
 
@@ -426,6 +465,7 @@ function AppContent() {
           {content}
         </Suspense>
         {consentBanner}
+        {toasts}
       </>
     )
   }
@@ -450,39 +490,7 @@ function AppContent() {
         </div>
       </div>
       {consentBanner}
-      {friendInviteNotice && (
-        <div className="toast toast-end toast-top z-50" data-testid="friend-request-notification">
-          <div className="alert alert-info shadow-lg" role="status" aria-live="polite">
-            <span><strong>{friendInviteNotice.fromName}</strong> sent you a friend request.</span>
-            <button type="button" className="btn btn-sm" onClick={() => { navigate({ screen: 'home' }); setFriendInviteNotice(null) }}>Open</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFriendInviteNotice(null)}>Dismiss</button>
-          </div>
-        </div>
-      )}
-      {workspaceInviteNotice && (
-        <div className="toast toast-end toast-top z-50" data-testid="workspace-invite-notification">
-          <div className="alert alert-info shadow-lg" role="status" aria-live="polite">
-            <span>
-              <strong>{workspaceInviteNotice.fromName}</strong>{' '}
-              invited you to <strong>{workspaceInviteNotice.payload.invite.workspaceName}</strong>.
-            </span>
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => void openWorkspaceInvitation(workspaceInviteNotice)}
-            >
-              Join
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => presence.dismissWorkspaceInvite(workspaceInviteNotice.inviteId)}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
+      {toasts}
     </>
   )
 }
@@ -491,7 +499,6 @@ function App() {
   return (
     <>
       <AppContent />
-      <UpdateNotice />
       <AppVersionBadge />
     </>
   )

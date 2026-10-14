@@ -58,7 +58,8 @@ What this keeps:
 it, which is also all that can use the device key. When a peer presents this device's key, the tab asks "who holds tab
 key X?" and waits up to 1.5 s for another tab to answer. Each tab holds a Web Lock `peerly-tab:<id>` for its lifetime,
 which the browser releases when the tab closes, crashes or is discarded; an answer from a tab whose lock is gone is a
-stale tab and does not count. Without BroadcastChannel no tab is a sibling, which is the old one-tab behaviour.
+stale tab and does not count. That lock does not hold a reload into a new deploy (`src/updates.ts`); a claim's short
+lock does. Without BroadcastChannel no tab is a sibling, which is the old one-tab behaviour.
 
 `useWorkspaceAuth` records which verified peers are siblings (`isSiblingTab(peerId)`), before the room reports them
 joined.
