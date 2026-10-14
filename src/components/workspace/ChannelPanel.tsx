@@ -288,7 +288,7 @@ export function ChannelPanel({
           className="shrink-0 border-b border-error/25 bg-error/10 px-3 py-1.5 text-xs text-error sm:px-5"
           data-testid="file-error"
         >
-          {fileError}
+          {tr(fileError)}
         </div>
       )}
 

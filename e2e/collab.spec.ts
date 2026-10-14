@@ -25,6 +25,7 @@ import {
   e2eWorkspaceId,
   waitForHistoryPersisted,
   e2eWorkspaceRouteId,
+  attachFiles,
 } from './helpers'
 import path from 'path'
 import fs from 'fs'
@@ -668,7 +669,7 @@ test.describe('Peerly P2P collaboration', () => {
 
   test('composer accepts multiple files in one selection', async ({ page }) => {
     await joinWorkspace(page, { name: 'Alice', email: 'alice@e2e.test' })
-    await page.getByTestId('file-input').setInputFiles([
+    await attachFiles(page, [
       { name: 'one.txt', mimeType: 'text/plain', buffer: Buffer.from('one') },
       { name: 'two.txt', mimeType: 'text/plain', buffer: Buffer.from('two') },
     ])
@@ -680,7 +681,7 @@ test.describe('Peerly P2P collaboration', () => {
   test('on-demand image sync shows a thumbnail before transferring the original', async ({ browser }) => {
     await withTwoUsers(browser, async (alice, bob) => {
       const png = fs.readFileSync(path.join(process.cwd(), 'public/icon-192.png'))
-      await alice.getByTestId('file-input').setInputFiles({
+      await attachFiles(alice, {
         name: 'thumbnail-first.png',
         mimeType: 'image/png',
         buffer: png,
@@ -728,8 +729,7 @@ test.describe('Peerly P2P collaboration', () => {
     const tmpFile = path.join(os.tmpdir(), `peerly-test-${Date.now()}.txt`)
     fs.writeFileSync(tmpFile, 'Hello from shared file!')
 
-    const fileInput = alice.getByTestId('file-input')
-    await fileInput.setInputFiles(tmpFile)
+    await attachFiles(alice, tmpFile)
 
     await expect(bob.locator('.message-list')).toContainText('test-', { timeout: 45_000 })
     await bob.getByTestId('toggle-files').click()
@@ -771,7 +771,7 @@ test.describe('Peerly P2P collaboration', () => {
         'iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9QzwAEjDAGADPBAv0C90OhAAAAAElFTkSuQmCC',
         'base64'
       )
-      await alice.getByTestId('file-input').setInputFiles({
+      await attachFiles(alice, {
         name: 'shared.png',
         mimeType: 'image/png',
         buffer: png,
@@ -914,7 +914,7 @@ test.describe('Peerly P2P collaboration', () => {
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
       'base64'
     )
-    await page.getByTestId('file-input').setInputFiles({
+    await attachFiles(page, {
       name: 'shared-photo.png',
       mimeType: 'image/png',
       buffer: png,
@@ -943,7 +943,7 @@ test.describe('Peerly P2P collaboration', () => {
     await joinWorkspace(page, { name: 'Alice', email: 'alice@e2e.test' })
     await waitForSignaling(page)
 
-    await page.getByTestId('file-input').setInputFiles({
+    await attachFiles(page, {
       name: 'notes.txt',
       mimeType: 'text/plain',
       buffer: Buffer.from('hello from a shared file'),
@@ -1018,7 +1018,7 @@ test.describe('Peerly P2P collaboration', () => {
     const tmpFile = path.join(os.tmpdir(), `peerly-rejoin-${Date.now()}.txt`)
     fs.writeFileSync(tmpFile, 'File survives rejoin!')
 
-    await alice.getByTestId('file-input').setInputFiles(tmpFile)
+    await attachFiles(alice, tmpFile)
     await expect(bob.locator('.message-list')).toContainText('peerly-rejoin-', { timeout: 45_000 })
 
     await rejoinWorkspace(bob, { name: 'Bob', email: 'bob@e2e.test' })

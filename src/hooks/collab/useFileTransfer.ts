@@ -3,6 +3,7 @@ import { mayExchangeChannel, routeDmChannel } from '../../collab/dmStore'
 import { useCallback, useRef, useState, type RefObject } from 'react'
 import { recordSyncActivity, syncPayloadBytes } from '@peerly/core'
 import {
+  FILES_NEED_CONNECTION_ERROR,
   FILE_TOO_LARGE_ERROR,
   MAX_FILE_BYTES,
   FILE_REQUEST_STAGGER_MS,
@@ -91,6 +92,8 @@ export function useFileTransfer(
 
   const bindFileMetaAction = useCallback((action: FileMetaAction) => {
     fileMetaActionRef.current = action
+    // Connected now: an earlier "not connected" no longer holds.
+    setFileError(error => (error === FILES_NEED_CONNECTION_ERROR ? null : error))
   }, [])
 
   const unbindFileMetaAction = useCallback(() => {
@@ -275,7 +278,11 @@ export function useFileTransfer(
   const sendFile = useCallback(
     async (file: File, onLocalMessage: (message: Message) => void) => {
       const fileMetaAction = fileMetaActionRef.current
-      if (!fileMetaAction) return
+      // A file picked before the room connected, or after it dropped, reaches nobody: say so.
+      if (!fileMetaAction) {
+        setFileError(FILES_NEED_CONNECTION_ERROR)
+        return
+      }
 
       // Check before arrayBuffer(): reading it is what would blow the heap.
       if (file.size > MAX_FILE_BYTES) {

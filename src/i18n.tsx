@@ -14,6 +14,7 @@ const pl: Record<string, string> = {
 }
 
 const plByEnglish: Record<string, string> = {
+  'Not connected yet, so the file was not shared. Try again in a moment.': 'Brak połączenia, więc plik nie został wysłany. Spróbuj za chwilę.',
   'Cancel retry': 'Anuluj ponawianie',
   'Profile & preferences': 'Profil i preferencje',
   'These preferences apply across Peerly, not to a single workspace.': 'Te preferencje dotyczą całego Peerly, a nie jednej przestrzeni.',
