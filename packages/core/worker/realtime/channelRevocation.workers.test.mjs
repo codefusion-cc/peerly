@@ -43,7 +43,7 @@ it('revokes content and lobby sockets before acknowledging, and rejects a stale 
   const goodContent = await connect(content, good, a), badContent = await connect(content, bad, b)
   const goodLobby = await connect(lobby, good, a), badLobby = await connect(lobby, bad, b)
   await command(control, 'device.revoke', { deviceKeyId: bad.deviceKeyId })
-  expect((await gateway.validateSession({ sid: b.sid, dk: bad.deviceKeyId, epoch: b.epoch })).ok).toBe(false)
+  expect((await gateway.validateChannelSession({ sid: b.sid, dk: bad.deviceKeyId })).ok).toBe(false)
   await vi.waitFor(() => {
     expect(badContent.closed).toContain(4001)
     expect(badLobby.closed).toContain(4001)

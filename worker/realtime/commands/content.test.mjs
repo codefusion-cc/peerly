@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { derivePrivateMemberId } from '../../../packages/core/worker/realtime/crypto.mjs'
+import { deriveMemberId } from '@codefusion-cc/realtime'
 import {
   createContentHandlers,
   dmContentAuthorizeCommand,
@@ -23,7 +23,7 @@ function build(authorizeResult = { ok: true }) {
 
 describe('Peerly durable content authorization', () => {
   it('accepts a valid creator-signed workspace list for its verified member', async () => {
-    const privateMemberId = await derivePrivateMemberId(
+    const privateMemberId = await deriveMemberId(
       SECRET,
       'peerly',
       'alice@e2e.test'
@@ -66,7 +66,7 @@ describe('Peerly durable content authorization', () => {
         {
           identity: 'opaque-alice',
           publicUserId: 'public-alice',
-          privateMemberId: await derivePrivateMemberId(
+          privateMemberId: await deriveMemberId(
             SECRET,
             'peerly',
             'alice@e2e.test'
@@ -80,7 +80,7 @@ describe('Peerly durable content authorization', () => {
       handlers['workspace.content.authorize'](validPayload, {
         identity: 'opaque-mallory',
         publicUserId: 'public-mallory',
-        privateMemberId: await derivePrivateMemberId(
+        privateMemberId: await deriveMemberId(
           SECRET,
           'peerly',
           'mallory@e2e.test'

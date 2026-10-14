@@ -4,7 +4,11 @@
  * what lets every routing and lifetime rule be exercised without a runtime.
  */
 import type { Authorization, ScopeStore } from './signalScopeRuntime.js'
-import type { SqlExecutor } from './sqlGatewayStorage.js'
+
+/** The slice of the runtime's SQL API this store needs. */
+export interface SqlExecutor {
+  exec<T = Record<string, unknown>>(query: string, ...bindings: unknown[]): { toArray(): T[] }
+}
 
 export const SCOPE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS authorizations (

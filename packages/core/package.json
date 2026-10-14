@@ -1,6 +1,7 @@
 {
   "name": "@peerly/core",
   "version": "1.16.0",
+  "private": true,
   "description": "Reusable encrypted realtime core with authenticated Durable Objects, P2P rooms, device identity, signing, media, and presence",
   "license": "MIT",
   "repository": {
@@ -30,9 +31,6 @@
     "./worker/lobby-identity": {
       "default": "./worker/lobbyIdentity.mjs"
     },
-    "./worker/realtime": {
-      "default": "./worker/realtime/index.mjs"
-    },
     "./realtime/protocol": {
       "types": "./dist/protocol/index.d.ts",
       "default": "./dist/protocol/index.js"
@@ -44,21 +42,6 @@
     "./realtime/ports": {
       "types": "./dist/ports/index.d.ts",
       "default": "./dist/ports/index.js"
-    },
-    "./realtime/gateway": {
-      "types": "./dist/adapters/durableObject/gatewayRuntime.d.ts",
-      "default": "./dist/adapters/durableObject/gatewayRuntime.js"
-    },
-    "./realtime/gateway-storage": {
-      "types": "./dist/adapters/durableObject/sqlGatewayStorage.d.ts",
-      "default": "./dist/adapters/durableObject/sqlGatewayStorage.js"
-    },
-    "./realtime/app": {
-      "types": "./dist/app/index.d.ts",
-      "default": "./dist/app/index.js"
-    },
-    "./worker/realtime/gateway": {
-      "default": "./worker/realtime/gateway/userGateway.mjs"
     },
     "./worker/realtime/channel": {
       "default": "./worker/realtime/gateway/authorizedChannel.mjs"

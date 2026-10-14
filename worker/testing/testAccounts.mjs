@@ -24,10 +24,10 @@ export async function createTestAccounts({ issuer, clientId, app, origin }) {
   const publicJwk = { ...(await crypto.subtle.exportKey('jwk', pair.publicKey)), kid: 'e2e', alg: 'RS256', use: 'sig' }
   const jwksUrl = `${issuer}/.well-known/jwks.json`
 
-  /** An RS256 id token for `email`, bound to a device key through `nonce`. */
-  async function mintIdToken({ email, nonce, subject }) {
+  /** An RS256 id token for `email`, bound to a device key through `nonce`, issued at `issuedAt` (now by default). */
+  async function mintIdToken({ email, nonce, subject, issuedAt = Date.now() }) {
     const header = { alg: 'RS256', typ: 'JWT', kid: 'e2e' }
-    const nowSeconds = Math.floor(Date.now() / 1000)
+    const nowSeconds = Math.floor(issuedAt / 1000)
     const claims = {
       iss: issuer,
       aud: clientId,

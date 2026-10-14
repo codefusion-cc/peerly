@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { createTestAccounts } from '../../packages/core/worker/realtime/testAccounts.mjs'
+import { createTestAccounts } from '../testing/testAccounts.mjs'
 import worker from '../index.mjs'
 
 /**

@@ -17,11 +17,6 @@ export {
   type CloseCode, type Envelope, type ErrorCode,
 } from './frames.js'
 export {
-  CommandRegistry, coreCommands, defineCommand,
-  deviceRevokeCommand, helloCommand, inviteAckCommand, inviteSendCommand,
-  normalizeExclusions, normalizeInterests, resumeCommand, ringSendCommand,
-  scopeLeaveCommand, scopeRequestCommand, signalCommand, SCOPE_KINDS,
-  type CommandSpec, type DeviceRevokePayload, type HelloPayload, type InviteAckPayload,
-  type InviteSendPayload, type ResumePayload, type RingSendPayload, type ScopeKind,
-  type ScopeLeavePayload, type ScopeRequestPayload, type SignalPayload,
+  defineCommand, signalCommand, SCOPE_KINDS,
+  type CommandSpec, type ScopeKind, type SignalPayload,
 } from './commands.js'

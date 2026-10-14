@@ -41,6 +41,12 @@
   },
   "ratelimits": [
     {
+      // Caps identity certificates (/api/realtime/identity) per account.
+      "name": "IDENTITY_RATE_LIMITER",
+      "namespace_id": "1009",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
       // Caps how often the public /api/media/health asks Cloudflare for TURN
       // credentials, per location, beyond its one-minute shared answer.
       "name": "MEDIA_RATE_LIMITER",

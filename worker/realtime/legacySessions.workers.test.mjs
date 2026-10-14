@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   deriveMemberId, deriveOpaqueUserId, deriveScopeRouteId, mintCapability, mintCookie, verifyCapability, verifyCookie,
 } from '@codefusion-cc/realtime'
-import * as legacy from '../../packages/core/worker/realtime/crypto.mjs'
 import worker from '../index.mjs'
 
 /**
@@ -14,10 +13,10 @@ import worker from '../index.mjs'
  * hold the sessions that code wrote. None of them may be signed out by the
  * move.
  *
- * The tokens below were minted by that code on 2026-10-14 for a test device
- * whose key is right here, with test-only secrets, and run to 2100. They are
- * frozen on purpose: a change to the token format that would sign every
- * device out turns this file red.
+ * The tokens below were minted by that code on 2026-10-14 (this file's first
+ * commit checked it) for a test device whose key is right here, with
+ * test-only secrets, and run to 2100. They are frozen on purpose: a change to
+ * the token format that would sign every device out turns this file red.
  */
 
 const LEGACY = {
@@ -57,17 +56,6 @@ const deployment = () => ({
 afterEach(() => vi.restoreAllMocks())
 
 describe('tokens minted before the move', () => {
-  it('were minted by the code they replace', async () => {
-    expect(await legacy.mintCapability(LEGACY.secret, { ...legacyClaims, privateMemberId: LEGACY.memberId, epoch: 0 }))
-      .toBe(LEGACY.capability)
-    expect(await legacy.mintCookie(LEGACY.secret, { ...legacyClaims, privateMemberId: LEGACY.memberId }))
-      .toBe(LEGACY.cookie)
-    expect(await legacy.deriveOpaqueUserId(LEGACY.opaqueSecret, 'peerly', 'https://accounts.google.com', '1234567890'))
-      .toBe(LEGACY.uid)
-    expect(await legacy.derivePrivateMemberId(LEGACY.opaqueSecret, 'peerly', ' Ada@Example.com ')).toBe(LEGACY.memberId)
-    expect(await legacy.deriveScopeRouteId(LEGACY.opaqueSecret, 'peerly', 'workspace', 'cap-abc')).toBe(LEGACY.scopeRouteId)
-  })
-
   it('are the very tokens the package mints from the same claims', async () => {
     expect(await mintCapability(LEGACY.secret, { ...legacyClaims, memberId: LEGACY.memberId, epoch: 0 })).toBe(LEGACY.capability)
     expect(await mintCookie(LEGACY.secret, { ...legacyClaims, memberId: LEGACY.memberId })).toBe(LEGACY.cookie)
