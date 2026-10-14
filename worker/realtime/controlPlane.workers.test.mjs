@@ -5,6 +5,7 @@ import { deriveUserId } from '../../packages/core/dist/userId.js'
 import { clearOidcJwksCache } from '../../packages/core/worker/oidc.mjs'
 import { workspacePolicy } from './commands/content.test-fixtures.mjs'
 import { createTestAccounts, openPageControlSocket } from '../testing/testAccounts.mjs'
+import { deviceSignInNonce } from '../../src/auth/deviceToken.ts'
 import worker from '../index.mjs'
 
 /**
@@ -59,6 +60,17 @@ describe('signing in', () => {
     await controlSocket(bob.cookie)
   })
 
+  it('lets every device and tab of one account reconnect at once, as after a deploy', async () => {
+    fakeIdentityProvider()
+    const devices = []
+    for (let n = 0; n < 4; n += 1) devices.push(await signIn('alice-reconnect@e2e.test', 'sub-alice-reconnect'))
+    // Four sign-ins and twelve refreshes in the same minute: past the ten one device may make.
+    for (let round = 0; round < 3; round += 1) {
+      const answers = await Promise.all(devices.map(async device => (await call(await device.establish())).status))
+      expect(answers).toEqual([200, 200, 200, 200])
+    }
+  })
+
   it('refuses a token whose nonce names another device key', async () => {
     fakeIdentityProvider()
     const device = await accounts.createDevice()
@@ -72,7 +84,7 @@ describe('signing in', () => {
     clearOidcJwksCache()
     keysReachable = false
     const device = await accounts.createDevice()
-    const token = await accounts.mintIdToken({ email: 'outage@e2e.test', nonce: device.deviceKeyId, subject: 'sub-outage' })
+    const token = await accounts.mintIdToken({ email: 'outage@e2e.test', nonce: deviceSignInNonce(device.deviceKeyId), subject: 'sub-outage' })
     const response = await enroll(device, token)
     expect(response.status).toBe(503)
     expect(response.headers.get('retry-after')).toBe('30')
@@ -83,14 +95,14 @@ describe('signing in', () => {
     clearOidcJwksCache()
     keysAnswer = () => new Response('<html>Service unavailable</html>', { status: 200, headers: { 'content-type': 'text/html' } })
     const device = await accounts.createDevice()
-    const token = await accounts.mintIdToken({ email: 'outage-html@e2e.test', nonce: device.deviceKeyId, subject: 'sub-outage-html' })
+    const token = await accounts.mintIdToken({ email: 'outage-html@e2e.test', nonce: deviceSignInNonce(device.deviceKeyId), subject: 'sub-outage-html' })
     expect((await enroll(device, token)).status).toBe(503)
   })
 
   it('has no oidc provider where VITE_OIDC_* is unset', async () => {
     fakeIdentityProvider()
     const device = await accounts.createDevice()
-    const token = await accounts.mintIdToken({ email: 'nobody@e2e.test', nonce: device.deviceKeyId, subject: 'sub-nobody' })
+    const token = await accounts.mintIdToken({ email: 'nobody@e2e.test', nonce: deviceSignInNonce(device.deviceKeyId), subject: 'sub-nobody' })
     expect((await enroll(device, token, { ...env, CONTENT_BACKEND: 'p2p' })).status).toBe(503)
   })
 
@@ -164,7 +176,7 @@ describe('revoking a device from the devices page', () => {
     expect((await call(await phone.establish())).status).toBe(200)
     // A sign-in token issued before the revocation cannot enroll it again; one issued since can.
     const mint = issuedAt => accounts.mintIdToken({
-      email: 'alice-devices@e2e.test', nonce: laptop.device.deviceKeyId, subject: 'sub-alice-devices', issuedAt,
+      email: 'alice-devices@e2e.test', nonce: deviceSignInNonce(laptop.device.deviceKeyId), subject: 'sub-alice-devices', issuedAt,
     })
     expect((await enroll(laptop.device, await mint(Date.now() - 60_000))).status).toBe(401)
     expect((await enroll(laptop.device, await mint(Date.now()))).status).toBe(200)

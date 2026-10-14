@@ -89,7 +89,7 @@ export async function verifyOidcToken(token, provider, deviceKeyId, fetcher = fe
     emailVerifiedClaim: provider.verifiedClaim,
     now,
   })
-  if (!check.ok) throw new Error(`refused token: ${check.problem}`)
+  if (!check.ok) throw Object.assign(new Error(`refused token: ${check.problem}`), { problem: check.problem })
   return check.claims
 }
 
