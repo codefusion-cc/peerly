@@ -5,7 +5,7 @@ Per-screen behavior is in [views.md](views.md); several tabs of one browser in [
 
 ## Layout
 
-- `src/` the app. `App.tsx` session bootstrap and workspace routing, `routing.ts`, `config.ts` build config, `session.ts`, `i18n.tsx`.
+- `src/` the app. `App.tsx` session bootstrap and workspace routing, `routing.ts`, `config.ts` build config, `session.ts`, `i18n.tsx`, `updates.ts` (moves open tabs onto a new deploy).
 - `src/collab/` app policy: workspace stores, creator-signed allow-lists (`allowList.ts`), message signing, identity providers, DM and friends stores, mesh (`mesh.ts`), sibling tabs and once-per-browser attention (`browserTabs.ts`).
 - `src/components/` UI (join, workspace, chat, files, `VideoCall.tsx`), `src/hooks/` room, collab and auth wiring (`useCollab.ts`, `useRoom.ts`), `src/context/` collab context, `src/protocol/` message types and mappers, `src/realtime/content.ts` DO content client.
 - `packages/core/` published `@peerly/core`: generic rooms, signaling, device identity, per-tab session keys (`tabSession.ts`), peer handshake (`peerIdentityHandshake.ts`), OIDC checks, media, `worker/` (Google auth, rendezvous, `realtime/` DO runtime), `src/realtime/` (DO signaling client, ICE servers). The app imports it from source through an alias.
@@ -24,7 +24,7 @@ Per-screen behavior is in [views.md](views.md); several tabs of one browser in [
 
 ## @codefusion-cc packages
 
-`realtime-media` (Cloudflare TURN credentials and the media health check) and `console`: the Worker's `ConsoleAdmin` (`worker/console/`), `/version.json` and the build identity (`build-info.mjs`, `vite.config.ts`), and the CLI (`codefusion-console cloudflare <scopes> -- <command>` for Cloudflare commands, `codefusion-console secrets peerly` for the Worker secrets). Both Workers' invocations go to the console as their tail consumer. Shared product code is `@peerly/core` in `packages/core`.
+`app-update` (`src/updates.ts`: an open tab reloads onto a new deploy once no call, moving file transfer, changed field or write holds it, offering a refresh meanwhile; lazy pages whose chunks a deploy removed reload), `realtime-media` (Cloudflare TURN credentials and the media health check) and `console`: the Worker's `ConsoleAdmin` (`worker/console/`), `/version.json` and the build identity (`build-info.mjs`, `vite.config.ts`), and the CLI (`codefusion-console cloudflare <scopes> -- <command>` for Cloudflare commands, `codefusion-console secrets peerly` for the Worker secrets). Both Workers' invocations go to the console as their tail consumer. Shared product code is still `@peerly/core` in `packages/core`, which HeyHubs no longer uses; Peerly moves onto `@codefusion-cc/realtime` step by step.
 
 ## Tests and checks
 

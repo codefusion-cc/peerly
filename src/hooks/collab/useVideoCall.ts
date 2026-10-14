@@ -1,5 +1,6 @@
 import type { joinRoom } from '@trystero-p2p/nostr'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useUpdateHold } from '../../updates'
 import {
   inferJoinMode,
   listMediaDevices,
@@ -37,6 +38,7 @@ export function useVideoCall(
   } = {}
 ) {
   const [inCall, setInCall] = useState(false)
+  useUpdateHold(inCall)
   const [callMode, setCallMode] = useState<CallMediaMode>('video')
   const [incomingCallPeerId, setIncomingCallPeerId] = useState<string | null>(null)
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
