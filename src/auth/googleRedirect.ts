@@ -237,3 +237,25 @@ export function refreshGoogleQuietly(input: { deviceKeyId: string; email: string
   }
   return startGoogleRedirect({ deviceKeyId: input.deviceKeyId, purpose: 'refresh', email: input.email })
 }
+
+/**
+ * What a page load does about Google, before the first render: store the token it came back with, or leave to
+ * refresh an aging one quietly (`shouldRefreshGoogle`), or nothing. Never both, so a return that stored nothing
+ * cannot send the page straight back to Google. At load nothing is under way yet (no call, no upload).
+ */
+export async function settleGoogleAtLoad(input: {
+  deviceKeyId: string
+  token: string | null
+  providerId: string | null
+  email: string | null
+}): Promise<{ kind: 'stored'; credential: GoogleCredential } | { kind: 'leaving' } | { kind: 'stay' }> {
+  if (hasGoogleReturn()) {
+    const credential = await finishGoogleReturn(input.deviceKeyId)
+    return credential ? { kind: 'stored', credential } : { kind: 'stay' }
+  }
+  const { email } = input
+  if (email && await shouldRefreshGoogle(input) && refreshGoogleQuietly({ deviceKeyId: input.deviceKeyId, email })) {
+    return { kind: 'leaving' }
+  }
+  return { kind: 'stay' }
+}

@@ -157,6 +157,17 @@ describe('signing in', () => {
     expect(back.takeGoogleNotice('sign-in')).toEqual({ code: 'failed' })
   })
 
+  it('refuses a token for this device from another sign-in than the one this tab started', async () => {
+    const tab = fakeTab('/login')
+    const redirect = await page()
+    redirect.startGoogleRedirect({ deviceKeyId: DEVICE, purpose: 'sign-in' })
+    await throughGoogle(tab, { claims: { nonce: deviceSignInNonce(DEVICE) } })
+    const back = await page()
+    back.takeGoogleReturn()
+    expect(await back.finishGoogleReturn(DEVICE)).toBeNull()
+    expect(back.takeGoogleNotice('sign-in')).toEqual({ code: 'failed' })
+  })
+
   it('refuses a forged token', async () => {
     const tab = fakeTab('/login')
     const redirect = await page()
@@ -288,5 +299,46 @@ describe('the quiet refresh', () => {
     const back = await page()
     back.takeGoogleReturn()
     expect((await back.finishGoogleReturn(DEVICE))?.email).toBe('ada@example.com')
+  })
+})
+
+describe('a page load', () => {
+  const stored = async (ageMs: number) => {
+    const iat = Math.floor((Date.now() - ageMs) / 1000)
+    return { token: await google.token({ nonce: deviceSignInNonce(DEVICE), iat, exp: iat + 3600 }), providerId: 'google', email: 'ada@example.com' }
+  }
+
+  it('stores what it came back with and does not leave again, however old the token it had', async () => {
+    const tab = fakeTab('/login')
+    const redirect = await page()
+    redirect.startGoogleRedirect({ deviceKeyId: DEVICE, purpose: 'sign-in' })
+    await throughGoogle(tab, { claims: { email: 'ada@example.com' } })
+    const back = await page()
+    back.takeGoogleReturn()
+    const settled = await back.settleGoogleAtLoad({ deviceKeyId: DEVICE, ...await stored(20 * DAY) })
+    expect(settled.kind).toBe('stored')
+    expect(tab.assigned).toHaveLength(1)
+  })
+
+  it('stays after a return that stored nothing, instead of going straight back to Google', async () => {
+    const tab = fakeTab('/login')
+    const redirect = await page()
+    redirect.startGoogleRedirect({ deviceKeyId: DEVICE, purpose: 'sign-in' })
+    await throughGoogle(tab, { deny: 'server_error' })
+    const back = await page()
+    back.takeGoogleReturn()
+    expect((await back.settleGoogleAtLoad({ deviceKeyId: DEVICE, ...await stored(20 * DAY) })).kind).toBe('stay')
+    expect(tab.assigned).toHaveLength(1)
+  })
+
+  it('leaves quietly with an aging token, and stays with a young one', async () => {
+    const tab = fakeTab('/workspace/abc')
+    const redirect = await page()
+    expect((await redirect.settleGoogleAtLoad({ deviceKeyId: DEVICE, ...await stored(DAY) })).kind).toBe('stay')
+    expect(tab.assigned).toEqual([])
+    expect((await redirect.settleGoogleAtLoad({ deviceKeyId: DEVICE, ...await stored(4 * DAY) })).kind).toBe('leaving')
+    expect(new URL(tab.assigned[0]).searchParams.get('prompt')).toBe('none')
+    // The next load that day, its return lost: it stays.
+    expect((await (await page()).settleGoogleAtLoad({ deviceKeyId: DEVICE, ...await stored(4 * DAY) })).kind).toBe('stay')
   })
 })

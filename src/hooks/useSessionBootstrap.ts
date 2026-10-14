@@ -19,27 +19,27 @@ import {
 import { migrateWorkspaceRouteIds } from '../collab/workspaceStore'
 import { DeviceIdentity } from '../collab/deviceIdentity'
 import { ensureOidcAvatar } from '../collab/avatarService'
-import { finishGoogleReturn, hasGoogleReturn, refreshGoogleQuietly, shouldRefreshGoogle } from '../auth/googleRedirect'
+import { settleGoogleAtLoad } from '../auth/googleRedirect'
 
 /**
- * A return from Google is stored before the first render, so nobody sees the login screen flash. Otherwise, a page
- * load (nothing is under way yet: no call, no upload) may leave to refresh an aging Google token quietly; true when
- * it does, and the page shows nothing until it is back.
+ * A return from Google is stored before the first render, so nobody sees the login screen flash; or the page leaves
+ * to refresh an aging Google token (auth/googleRedirect). True when it leaves: the page shows nothing until it is
+ * back.
  */
 async function settleGoogleSignIn(): Promise<boolean> {
   if (isE2eAuthBypass()) return false
-  const deviceKeyId = await new DeviceIdentity().publicKeyId()
-  if (hasGoogleReturn()) {
-    const credential = await finishGoogleReturn(deviceKeyId)
-    if (credential) {
-      await ensureOidcAvatar(credential.picture)
-      saveIdCredentials(credential.token, 'google', credential.email, await deriveUserId(credential.iss, credential.sub))
-    }
-    return false
+  const settled = await settleGoogleAtLoad({
+    deviceKeyId: await new DeviceIdentity().publicKeyId(),
+    token: loadIdToken(),
+    providerId: loadIdentityProvider(),
+    email: loadIdentityEmail(),
+  })
+  if (settled.kind === 'stored') {
+    const { credential } = settled
+    await ensureOidcAvatar(credential.picture)
+    saveIdCredentials(credential.token, 'google', credential.email, await deriveUserId(credential.iss, credential.sub))
   }
-  const email = loadIdentityEmail()
-  const due = await shouldRefreshGoogle({ token: loadIdToken(), providerId: loadIdentityProvider(), email, deviceKeyId })
-  return due && email !== null && refreshGoogleQuietly({ deviceKeyId, email })
+  return settled.kind === 'leaving'
 }
 
 /**
