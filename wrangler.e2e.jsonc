@@ -42,6 +42,19 @@
   },
   "ratelimits": [
     {
+      // Caps session requests per account, across all its devices and tabs
+      // (@codefusion-cc/realtime). A deploy reconnects every tab at once.
+      "name": "SESSION_ACCOUNT_RATE_LIMITER",
+      "namespace_id": "1095",
+      "simple": { "limit": 60, "period": 60 }
+    },
+    {
+      // Caps identity certificates (/api/realtime/identity) per account.
+      "name": "IDENTITY_RATE_LIMITER",
+      "namespace_id": "1096",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
       "name": "RENDEZVOUS_RATE_LIMITER",
       "namespace_id": "1099",
       "simple": { "limit": 60, "period": 60 }

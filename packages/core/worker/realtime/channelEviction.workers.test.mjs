@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers'
 import { expect, it, vi } from 'vitest'
 import { channelIdentity, channelSession } from './channel.test-fixtures.mjs'
-import { LIMITS } from './index.mjs'
+import { LIMITS } from '@codefusion-cc/realtime'
 
 it('evicting a session closes its content and lobby sockets', async () => {
   const victim = channelIdentity('review-eviction')
@@ -24,6 +24,6 @@ it('evicting a session closes its content and lobby sockets', async () => {
   for (let i = 0; i < LIMITS.devicesPerAccount; i++) {
     await channelSession({ ...victim, deviceKeyId: channelIdentity(`replacement-${i}`).deviceKeyId })
   }
-  expect((await gateway.validateSession({ sid: session.sid, dk: victim.deviceKeyId, epoch: session.epoch })).ok).toBe(false)
+  expect((await gateway.validateChannelSession({ sid: session.sid, dk: victim.deviceKeyId })).ok).toBe(false)
   for (const { closed } of sockets) await vi.waitFor(() => expect(closed).toContain(4001))
 })

@@ -412,8 +412,6 @@ export {
   type DeviceSignerLike,
   type ErrorCode,
   type OidcCredentialProvider,
-  type RealtimeDeltaEvent,
-  type RealtimeFrame,
   type RoomEntry,
   type RoomPage,
   type ScopeHandle,

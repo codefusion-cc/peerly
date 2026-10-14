@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { MEDIA_HEALTH_CRON, MEDIA_HEALTH_PATH } from '@codefusion-cc/realtime-media'
+import { LIMITS } from '@codefusion-cc/realtime'
 import * as workerModule from './index.mjs'
 import worker, { allowedAuthParent } from './index.mjs'
 import { resolveContentBackend } from '../src/config.ts'
@@ -9,6 +10,7 @@ import { signInState } from '@codefusion-cc/google-sign-in/testing'
 
 const previewConfig = readWranglerConfig('wrangler.preview.jsonc')
 const productionConfig = readWranglerConfig('wrangler.jsonc')
+const e2eConfig = readWranglerConfig('wrangler.e2e.jsonc')
 
 describe('deployment profiles', () => {
   it('runs production on the Durable Objects with messages and files peer to peer', async () => {
@@ -55,6 +57,18 @@ describe('deployment profiles', () => {
       expect(config.ratelimits.map(limit => limit.name)).toEqual(expect.arrayContaining([
         'MEDIA_RATE_LIMITER', 'RENDEZVOUS_RATE_LIMITER', 'AUTH_RATE_LIMITER', 'AUTH_IP_RATE_LIMITER',
       ]))
+    })
+  }
+
+  for (const [name, config] of [['production', productionConfig], ['preview', previewConfig], ['e2e', e2eConfig]]) {
+    it(`gives ${name} the rate limits the realtime routes require, at the package's ceilings`, () => {
+      const limit = binding => config.ratelimits.find(entry => entry.name === binding)?.simple
+      // The package throws on a sign-in or identity request when one of these is missing.
+      expect(limit('AUTH_RATE_LIMITER')).toEqual({ limit: LIMITS.authRequestsPerMinute, period: 60 })
+      expect(limit('AUTH_IP_RATE_LIMITER')).toEqual({ limit: LIMITS.authRequestsPerMinutePerIp, period: 60 })
+      expect(limit('IDENTITY_RATE_LIMITER')).toEqual({ limit: 30, period: 60 })
+      // All of an account's devices and tabs reconnect at once after a deploy.
+      expect(limit('SESSION_ACCOUNT_RATE_LIMITER')).toEqual({ limit: 60, period: 60 })
     })
   }
 

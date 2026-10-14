@@ -25,10 +25,8 @@ export interface CoordinationTransport {
    *  instead of polled. Rejects when the deployment cannot push. */
   watchDirectory(): Promise<{ expiresAt: number }>
   unwatchDirectory(): Promise<void>
-  sendInvite(to: string, kind: string, body: object): Promise<void>
   /** Revoke one of this account's own devices server-side (sessions + sockets). */
   revokeDevice(deviceKeyId: string): Promise<void>
-  releaseScope(routeId: string): Promise<void>
   /**
    * App-owned control-plane command. Core owns delivery/retry/idempotency;
    * the consumer owns the command schema and handler.
@@ -111,16 +109,8 @@ class DurableObjectTransport implements CoordinationTransport {
     await this.client.send('directory.unwatch')
   }
 
-  async sendInvite(to: string, kind: string, body: object): Promise<void> {
-    await this.client.send('invite.send', { to, kind, body })
-  }
-
   async revokeDevice(deviceKeyId: string): Promise<void> {
     await this.client.send('device.revoke', { deviceKeyId })
-  }
-
-  async releaseScope(routeId: string): Promise<void> {
-    await this.client.send('scope.leave', { routeId })
   }
 
   sendCommand<T = unknown>(type: string, payload?: unknown): Promise<T> {

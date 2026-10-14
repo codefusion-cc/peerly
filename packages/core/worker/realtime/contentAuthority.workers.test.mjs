@@ -2,13 +2,13 @@ import { env } from 'cloudflare:workers'
 import { describe, expect, it } from 'vitest'
 import { createContentHandlers, workspaceContentAuthorizeCommand } from '../../../../worker/realtime/commands/content.mjs'
 import { workspacePolicy } from '../../../../worker/realtime/commands/content.test-fixtures.mjs'
-import { derivePrivateMemberId } from './crypto.mjs'
+import { deriveMemberId } from '@codefusion-cc/realtime'
 
 const secret = 'authority-regression-test-secret'
 async function identity(name) {
   return {
     identity: `opaque-${name}`, publicUserId: `user-${name}`, deviceKeyId: `device-${name}`,
-    privateMemberId: await derivePrivateMemberId(secret, 'peerly', `${name}@e2e.test`),
+    privateMemberId: await deriveMemberId(secret, 'peerly', `${name}@e2e.test`),
   }
 }
 function handlers() {

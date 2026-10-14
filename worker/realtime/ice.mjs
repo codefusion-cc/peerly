@@ -41,3 +41,13 @@ export async function issueIceServers(env, { fetcher = fetch, waitMs = TURN_WAIT
     clearTimeout(timer)
   }
 }
+
+/**
+ * The session route's answer with the ICE servers added (`ice`), as the page
+ * reads them. A refused session gets none and is passed on untouched.
+ */
+export async function withIceServers(response, env) {
+  if (response.status !== 200) return response
+  const body = await response.json()
+  return Response.json({ ...body, ice: await issueIceServers(env) }, { headers: response.headers })
+}

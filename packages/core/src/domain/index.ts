@@ -11,18 +11,6 @@ export {
   type Bucket, type BucketPolicy, type TakeResult,
 } from './rateLimit.js'
 export {
-  decideEnrollment, isSessionValid, nextEpoch,
-  type EnrollmentDecision, type SessionRecord,
-} from './deviceRegistry.js'
-export {
-  addToBatch, assignSequence, EMPTY_BATCH, planResume, retentionCutoff, shouldFlush,
-  type BatchState, type ResumePlan, type StoredEvent, type StreamEvent,
-} from './eventStream.js'
-export {
-  expiredLease, isLastSocket, leaseFor, renewAtMs,
-  type PresenceLease,
-} from './presence.js'
-export {
   claimableTopics, isScopeAbandoned, routeSignal,
   type Participant, type Routing,
 } from './signalRouting.js'

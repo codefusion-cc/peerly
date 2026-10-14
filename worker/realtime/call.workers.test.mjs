@@ -1,7 +1,7 @@
 import { abortAllDurableObjects, evictDurableObject, runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createTestAccounts } from '../../packages/core/worker/realtime/testAccounts.mjs'
+import { createTestAccounts } from '../testing/testAccounts.mjs'
 import worker from '../index.mjs'
 
 /**

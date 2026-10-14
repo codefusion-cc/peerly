@@ -176,7 +176,7 @@ Files and call media remain P2P in both modes.
 
 ### Durable Objects control plane
 
-The Worker ([`worker/index.mjs`](worker/index.mjs), shared code in [`packages/core/worker/realtime`](packages/core/worker/realtime)) handles device enrollment, session cookies, presence, workspace and DM notifications, WebRTC signaling and ICE servers under `/api/network/*` and `/api/realtime/*`. Its Durable Objects are `UserGatewayDO`, `SignalScopeDO`, `ContentChannelDO` and `LobbyChannelDO`. With `CONTENT_BACKEND=durable-objects` the browser encrypts messages, reactions and channel definitions with the workspace or DM secret, and the server persists only ciphertext and bounded routing metadata before broadcasting it. File bytes and calls stay WebRTC peer to peer.
+The Worker ([`worker/index.mjs`](worker/index.mjs)) handles device enrollment, session cookies, presence, workspace and DM notifications, WebRTC signaling and ICE servers under `/api/network/*` and `/api/realtime/*`. Enrollment, sessions, the control socket, logout and the account gateway come from [`@codefusion-cc/realtime`](https://www.npmjs.com/package/@codefusion-cc/realtime); Peerly adds its gateway commands in [`worker/realtime/`](worker/realtime). Its Durable Objects are `UserGatewayDO`, `SignalScopeDO`, `ContentChannelDO` and `LobbyChannelDO`. With `CONTENT_BACKEND=durable-objects` the browser encrypts messages, reactions and channel definitions with the workspace or DM secret, and the server persists only ciphertext and bounded routing metadata before broadcasting it. File bytes and calls stay WebRTC peer to peer.
 
 [`wrangler.jsonc`](wrangler.jsonc) (production) and [`wrangler.preview.jsonc`](wrangler.preview.jsonc) (preview) differ only in `CONTENT_BACKEND`, names and migration history. Both require the secrets `RENDEZVOUS_SECRET`, `NETWORK_SESSION_SECRET`, `OPAQUE_USER_ID_SECRET`, `TURN_KEY_ID` and `TURN_KEY_API_TOKEN`. A client pointed at an unconfigured Worker fails closed with `503`, and a stale or invalid capability fails with `400`/`401`.
 
@@ -190,7 +190,7 @@ cd /Users/xeon/Projects/Peerly && codefusion-console cloudflare workers:edit,dom
 
 `codefusion-console cloudflare <scope>[,<scope>…] [--ttl 30m] -- <command>` mints a token with exactly those scopes for that one command (two hours by default), hands it over as `CLOUDFLARE_API_TOKEN` with `CLOUDFLARE_ACCOUNT_ID`, and deletes it when the command exits; a token with an `:edit` scope waits for the owner's passkey tap on Dispatch. The preview deploy needs `workers:edit` and `domains:edit` (its `preview.peerly.cc` custom domain); its secrets (`codefusion-console cloudflare workers:edit -- npx wrangler secret put <NAME> -c wrangler.preview.jsonc`) need `workers:edit`. Once per Mac: `npm install -g @codefusion-cc/console && codefusion-console relay install`.
 
-Peerly's Worker and Durable Objects come from `packages/core/worker/realtime` and [`packages/core/src/realtime`](packages/core/src/realtime). That core is being replaced step by step by the shared `@codefusion-cc/realtime` packages HeyHubs already runs. [docs/DURABLE_OBJECTS_ARCHITECTURE.md](docs/DURABLE_OBJECTS_ARCHITECTURE.md) has the current design.
+Peerly's Worker runs its control plane on `@codefusion-cc/realtime`, the package HeyHubs also runs, with its own Durable Object namespaces, secrets and data. Peerly's page still talks to it through its older control client in [`packages/core/src/realtime`](packages/core/src/realtime), which goes step by step. [docs/DURABLE_OBJECTS_ARCHITECTURE.md](docs/DURABLE_OBJECTS_ARCHITECTURE.md) has the design.
 
 `npm run test:e2e` and `npm run test:e2e:do` drive it the way a user would: each builds the app, serves the build from the real Worker on localhost with real Durable Objects, and runs browser contexts against it, with peer-to-peer content and Durable Objects content respectively. Test-only sign-in there is configuration: a generic `oidc` provider whose JWKS is served from the build, set only in [`wrangler.e2e.jsonc`](wrangler.e2e.jsonc). A deployment that sets none of those variables resolves the provider to `null` and the route answers `503`, so it cannot be switched on by accident.
 
@@ -274,14 +274,12 @@ codefusion-console secrets peerly
 The generic P2P room core — room-code generation, signaling strategy selection,
 `joinRoomByCode`, the `useRoom` React hook, device identity, signing
 primitives, browser-side OIDC verification, room media, attention helpers, and
-shared avatar/IDB utilities — lives in [`packages/core`](packages/core) and is
-published to npm as [`@peerly/core`](packages/core/README.md) (see that README
-for the API surface; do not pin a version in prose here). The app consumes it
-from source via a Vite/tsconfig alias; consumer apps use the published package.
-Workspace semantics — creator-signed allow-lists, peer
-handshakes, history sanitization — deliberately stay in the app, not the
-package. Releases run through the `release-core.yml` workflow: manual trigger,
-npm Trusted Publishing with provenance, automatic version bump via release PR.
+shared avatar/IDB utilities — lives in [`packages/core`](packages/core)
+([`@peerly/core`](packages/core/README.md)). The app consumes it from source
+via a Vite/tsconfig alias. It is no longer published: its parts move to
+`@codefusion-cc/*` packages one by one, and it goes once Peerly no longer uses
+Trystero. Workspace semantics — creator-signed allow-lists, peer handshakes,
+history sanitization — deliberately stay in the app.
 
 ## Project structure
 

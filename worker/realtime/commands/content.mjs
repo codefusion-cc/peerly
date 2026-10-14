@@ -1,14 +1,5 @@
-import {
-  boundedArray,
-  boundedString,
-  defineCommand,
-  FrameError,
-  isPlainObject,
-} from '../../../packages/core/dist/protocol/index.js'
-import {
-  derivePrivateMemberId,
-  deriveScopeRouteId,
-} from '../../../packages/core/worker/realtime/index.mjs'
+import { deriveMemberId, deriveScopeRouteId } from '@codefusion-cc/realtime'
+import { boundedString, defineCommand, FrameError, isPlainObject } from '@codefusion-cc/realtime/protocol'
 
 const MAX_WORKSPACE_MEMBERS = 500
 const fail = type => {
@@ -70,11 +61,9 @@ export const workspaceContentAuthorizeCommand = defineCommand(
       !boundedString(payload.creatorKeyId, 256) ||
       !isPlainObject(allowList) ||
       allowList.scope !== payload.capability ||
-      !boundedArray(
-        allowList.emails,
-        MAX_WORKSPACE_MEMBERS,
-        email => boundedString(email, 254) && email.includes('@')
-      ) ||
+      !Array.isArray(allowList.emails) ||
+      allowList.emails.length > MAX_WORKSPACE_MEMBERS ||
+      !allowList.emails.every(email => boundedString(email, 254) && email.includes('@')) ||
       allowList.emails.length === 0 ||
       !Number.isSafeInteger(allowList.signedAt) ||
       allowList.signedAt < 0 ||
@@ -164,15 +153,12 @@ export function createContentHandlers(deps) {
           code: 'auth-required',
         })
       }
-      const memberIds = await Promise.all(
+      // The page lists any entry with an `@`; one that is no address admits nobody, and the rest still hold.
+      const memberIds = (await Promise.all(
         payload.allowList.emails.map(email =>
-          derivePrivateMemberId(
-            deps.opaqueUserIdSecret,
-            deps.appName,
-            email
-          )
+          deriveMemberId(deps.opaqueUserIdSecret, deps.appName, email).catch(() => null)
         )
-      )
+      )).filter(Boolean)
       if (!memberIds.includes(context.privateMemberId)) {
         throw new FrameError('workspace membership is required', {
           code: 'auth-required',

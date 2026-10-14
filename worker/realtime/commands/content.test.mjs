@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { derivePrivateMemberId } from '../../../packages/core/worker/realtime/crypto.mjs'
+import { deriveMemberId } from '@codefusion-cc/realtime'
 import {
   createContentHandlers,
   dmContentAuthorizeCommand,
@@ -23,7 +23,7 @@ function build(authorizeResult = { ok: true }) {
 
 describe('Peerly durable content authorization', () => {
   it('accepts a valid creator-signed workspace list for its verified member', async () => {
-    const privateMemberId = await derivePrivateMemberId(
+    const privateMemberId = await deriveMemberId(
       SECRET,
       'peerly',
       'alice@e2e.test'
@@ -66,7 +66,7 @@ describe('Peerly durable content authorization', () => {
         {
           identity: 'opaque-alice',
           publicUserId: 'public-alice',
-          privateMemberId: await derivePrivateMemberId(
+          privateMemberId: await deriveMemberId(
             SECRET,
             'peerly',
             'alice@e2e.test'
@@ -80,7 +80,7 @@ describe('Peerly durable content authorization', () => {
       handlers['workspace.content.authorize'](validPayload, {
         identity: 'opaque-mallory',
         publicUserId: 'public-mallory',
-        privateMemberId: await derivePrivateMemberId(
+        privateMemberId: await deriveMemberId(
           SECRET,
           'peerly',
           'mallory@e2e.test'
@@ -88,6 +88,19 @@ describe('Peerly durable content authorization', () => {
         deviceKeyId: 'device-mallory',
       })
     ).rejects.toThrow('workspace membership is required')
+  })
+
+  it('admits a listed member when another entry of the signed list is no address', async () => {
+    const { payload } = await workspacePolicy({ emails: ['alice@e2e.test', 'bob@@e2e.test'] })
+    const { handlers, authorize } = build()
+    await handlers['workspace.content.authorize'](workspaceContentAuthorizeCommand.validate(payload), {
+      identity: 'opaque-alice',
+      publicUserId: 'public-alice',
+      privateMemberId: await deriveMemberId(SECRET, 'peerly', 'alice@e2e.test'),
+      deviceKeyId: 'device-alice',
+    })
+    // The malformed entry admits nobody; the list itself still holds.
+    expect(authorize.mock.calls[0][0].authority.members).toEqual([await deriveMemberId(SECRET, 'peerly', 'alice@e2e.test')])
   })
 
   it('initializes a DM authority from exactly the authenticated pair', async () => {

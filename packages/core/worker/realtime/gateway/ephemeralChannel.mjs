@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers'
-import { activeChannelSession, bindChannelSession, expireChannelSessions, revokeChannelSession } from './channelSessions.mjs'
+import { activeChannelSession, bindChannelSession, expireChannelSessions, revokeChannelSession } from '@codefusion-cc/realtime'
 
 const DEFAULT_FRAME_BYTES = 48 * 1024
 const DEFAULT_MAX_CONNECTIONS = 1_000
