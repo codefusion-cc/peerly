@@ -50,18 +50,16 @@ const PERSIST_KEY = 'peerly-session'
  *   force a fresh sign-in. It was session-scoped on the reasoning that a
  *   bearer credential should not survive a restart; that traded a real,
  *   constant cost — signing in again every single time — against a narrow
- *   benefit, because the token is short-lived anyway (~1h) and every peer
- *   re-verifies it rather than trusting our copy. What actually bounds the
- *   exposure is that expiry, not where the string sat. Changed deliberately,
- *   2026-07-28.
+ *   benefit: the token is bound to this device's key (auth/deviceToken), so a
+ *   copy is useless without it, and every peer re-verifies it rather than
+ *   trusting ours. Changed deliberately, 2026-07-28.
  * - The identity METADATA (email, provider, durable userId) is not a
  *   credential — it only drives what the UI offers (your workspaces, whose
  *   name, which provider to re-auth with). Peers never trust it; they verify
  *   the token itself in the handshake.
  *
- * A stored token is only half of "sign in once": tokens expire hourly, so
- * useIdentityRenewal keeps a live one without asking. Without that, this
- * storage change only moves the interruption from restart to the next hour.
+ * A token is accepted for 30 days after it was issued (auth/deviceToken), and
+ * a page load quietly refreshes an aging Google one (auth/googleRedirect).
  */
 const ID_TOKEN_KEY = 'peerly-id-token'
 const ID_USER_ID_KEY = 'peerly-id-user-id'
@@ -134,8 +132,8 @@ export function idTokenUsableUntil(token: string): number | null {
 }
 
 /**
- * ID tokens live about an hour. An expired token is treated as no token, but
- * ONLY the token is dropped — the identity metadata (who you are) survives so
+ * A token past its 30 days is treated as no token, but ONLY the token is
+ * dropped — the identity metadata (who you are) survives so
  * the workspace stays open and the ReauthBanner can offer a one-click renewal
  * with the same account, instead of dumping the user back to the join screen.
  */
@@ -249,7 +247,7 @@ export function loadSignedInIdentity(): StoredIdentity | null {
 }
 
 /**
- * The open workspace, independent of ID-token freshness. Tokens live ~1h; the
+ * The open workspace, independent of ID-token freshness. Tokens end; the
  * workspace session must not — everything needed to come back (workspace
  * secret, allow-list, profile) is durable, message signing uses the device
  * key, and only NEW peer handshakes need a live token. A reload past token
