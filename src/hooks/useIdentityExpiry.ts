@@ -4,7 +4,7 @@ import {
   msUntilPhaseChange,
   type IdentityExpiryPhase,
 } from '../collab/identityExpiry'
-import { idTokenExpiryMs, loadIdToken } from '../session'
+import { idTokenUsableUntil, loadIdToken } from '../session'
 
 /**
  * Tracks the signed-in token's lifetime and re-evaluates exactly at the two
@@ -22,7 +22,7 @@ export function useIdentityExpiry(): {
   const readExpiry = () => {
     const token = loadIdToken()
     if (!token) return null
-    return idTokenExpiryMs(token) ?? Infinity
+    return idTokenUsableUntil(token) ?? Infinity
   }
   const [expiresAtMs, setExpiresAtMs] = useState<number | null>(readExpiry)
   const [phase, setPhase] = useState<IdentityExpiryPhase>(() =>

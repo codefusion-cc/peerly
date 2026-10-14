@@ -1,5 +1,5 @@
 import { utf8ToBase64Url, bytesToBase64Url } from '../utils/base64url'
-import type { JwkWithKid } from './oidcIdToken'
+type JwkWithKid = JsonWebKey & { kid?: string }
 import { E2E_GOOGLE_CLIENT_ID } from './e2eConstants'
 // Imported, not restated. The browser E2E harness serves the same file as a
 // real JWKS endpoint so the worker can verify what this module mints; two

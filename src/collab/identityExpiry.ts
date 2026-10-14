@@ -1,8 +1,9 @@
 /**
  * Phase logic for the ID-token lifetime.
  *
- * Tokens live about an hour. The reload path already handles "expired before
- * open" (session.loadIdToken), but a workspace kept open past expiry silently
+ * A device-bound token is accepted for 30 days (auth/deviceToken). The reload
+ * path already handles "expired before open" (session.loadIdToken), but a
+ * workspace kept open past that silently
  * loses the ability to admit anyone new — every fresh handshake presents a
  * dead token — while the connection UI keeps saying everything is fine. These
  * phases drive a banner that warns before that cliff and offers re-auth after.
@@ -10,8 +11,11 @@
 
 export type IdentityExpiryPhase = 'ok' | 'expiring' | 'expired'
 
-/** Warn early enough to act, late enough not to nag: 5 minutes. */
-export const EXPIRY_WARN_MS = 5 * 60_000
+/** Warn early enough to act, late enough not to nag: the last day of the token's 30. */
+export const EXPIRY_WARN_MS = 24 * 60 * 60_000
+
+/** The longest delay a browser timer keeps; a later boundary is checked again then. */
+const MAX_TIMER_MS = 2 ** 31 - 1
 
 export function identityExpiryPhase(
   expiresAtMs: number | null,
@@ -32,5 +36,5 @@ export function msUntilPhaseChange(expiresAtMs: number | null, nowMs: number): n
   const boundary = nowMs < expiresAtMs - EXPIRY_WARN_MS ? expiresAtMs - EXPIRY_WARN_MS : expiresAtMs
   if (nowMs >= expiresAtMs) return null
   // Never fire early on timer drift: clamp to at least a second.
-  return Math.max(1_000, boundary - nowMs)
+  return Math.min(MAX_TIMER_MS, Math.max(1_000, boundary - nowMs))
 }

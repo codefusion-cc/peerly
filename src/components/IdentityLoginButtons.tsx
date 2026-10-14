@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ensureOidcAvatar, resolveAvatarPreview } from '../collab/avatarService'
 import { loadStoredProfile } from '../collab/profileStore'
 import { isE2eAuthBypass } from '../collab/e2eAuth'
-import { renderGoogleSignInButton } from '../collab/googleAuth'
+import { googleNoticeText, startGoogleRedirect, takeGoogleNotice } from '../auth/googleRedirect'
 import {
   getConfiguredIdentityProviders,
   getIdentityProvider,
@@ -33,6 +33,18 @@ type Props = {
   busy: boolean
   onBusyChange: (busy: boolean) => void
   onError: (message: string | null) => void
+}
+
+/** Google's "G", as its sign-in branding asks a button to show it. */
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 48 48" className="size-5 shrink-0" aria-hidden="true" focusable="false">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  )
 }
 
 /** Compact identity chip, shown at the top once signed in. */
@@ -96,11 +108,38 @@ export function IdentityLoginButtons({
   onBusyChange,
   onError,
 }: Props) {
-  const { tr } = useI18n()
+  const { tr, locale } = useI18n()
   const providers = getConfiguredIdentityProviders()
-  const googleContainerRef = useRef<HTMLDivElement>(null)
-  const [googleMountKey, setGoogleMountKey] = useState(0)
   const [e2eEmail, setE2eEmail] = useState('alice@e2e.test')
+  const [leavingForGoogle, setLeavingForGoogle] = useState(false)
+
+  // What came of a return from Google that stored nothing (a cancel says nothing).
+  useEffect(() => {
+    const notice = takeGoogleNotice('sign-in')
+    if (notice) onError(googleNoticeText(notice, tr))
+  }, [onError, tr])
+
+  // Back from Google's page by the Back button: this page comes out of the back-forward cache as it was left.
+  useEffect(() => {
+    const restored = (event: PageTransitionEvent) => {
+      if (event.persisted) setLeavingForGoogle(false)
+    }
+    window.addEventListener('pageshow', restored)
+    return () => window.removeEventListener('pageshow', restored)
+  }, [])
+
+  const continueWithGoogle = async () => {
+    onError(null)
+    setLeavingForGoogle(true)
+    try {
+      const deviceKeyId = await authManager.deviceKeyId()
+      if (startGoogleRedirect({ deviceKeyId, purpose: 'sign-in', locale })) return
+      onError(tr('Signing in needs this site’s storage. Allow site data for Peerly in your browser and try again.'))
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err))
+    }
+    setLeavingForGoogle(false)
+  }
 
   const completeSignIn = useCallback(
     async (providerId: IdentityProviderId, token: string) => {
@@ -114,8 +153,6 @@ export function IdentityLoginButtons({
     },
     [authManager, onSignedIn]
   )
-  const completeSignInRef = useRef(completeSignIn)
-  completeSignInRef.current = completeSignIn
 
   const handleProviderSignIn = async (providerId: IdentityProviderId) => {
     onError(null)
@@ -158,44 +195,12 @@ export function IdentityLoginButtons({
     }
   }
 
-  const hasGoogle = providers.some(provider => provider.id === 'google')
-
-  useEffect(() => {
-    if (signedIn || isE2eAuthBypass() || !hasGoogle) return
-
-    const provider = getIdentityProvider('google')
-    const container = googleContainerRef.current
-    if (!provider || !container) return
-
-    let cancelled = false
-    container.innerHTML = ''
-
-    void (async () => {
-      try {
-        const keyId = await authManager.deviceKeyId()
-        if (cancelled) return
-        const token = await renderGoogleSignInButton(container, keyId, provider.clientId)
-        if (cancelled) return
-        await completeSignInRef.current('google', token)
-      } catch {
-        // Dismissed Google prompt or render failure — user can retry via sign out / refresh.
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [signedIn, hasGoogle, googleMountKey, authManager])
-
   if (signedIn) {
     return (
       <SignedInChip
         signedIn={signedIn}
         busy={busy}
-        onSignOut={() => {
-          onSignOut()
-          setGoogleMountKey(key => key + 1)
-        }}
+        onSignOut={onSignOut}
       />
     )
   }
@@ -248,15 +253,22 @@ export function IdentityLoginButtons({
       <div className="flex flex-col items-center gap-2" data-testid="identity-providers">
         {providers.map(provider =>
           provider.id === 'google' ? (
-            // Google renders its own button (an iframe) into this slot, so we
-            // cannot style it — the others are sized to match it instead.
-            <div
+            <button
               key="google"
-              ref={googleContainerRef}
-              className="google-signin-slot flex min-h-10 w-full justify-center"
-              data-signin-container="google"
-              data-testid="google-signin"
-            />
+              type="button"
+              className="btn btn-outline w-full gap-3"
+              data-testid="signin-google"
+              onClick={() => void continueWithGoogle()}
+              disabled={busy || leavingForGoogle}
+              aria-busy={leavingForGoogle}
+            >
+              {leavingForGoogle ? (
+                <span className="loading loading-spinner loading-sm" aria-hidden="true" />
+              ) : (
+                <GoogleMark />
+              )}
+              {leavingForGoogle ? `${tr('Opening Google')}…` : `${tr('Continue with')} Google`}
+            </button>
           ) : (
             <button
               key={provider.id}

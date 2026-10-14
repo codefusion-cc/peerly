@@ -1,5 +1,4 @@
 import type { DeviceKeyId } from './deviceIdentity'
-import { renderGoogleSignInButton } from './googleAuth'
 import {
   getIdentityProvider,
   type IdentityProvider,
@@ -25,12 +24,9 @@ export async function signInWithProviderConfig(
   deviceKeyId: DeviceKeyId
 ): Promise<string> {
   switch (provider.id) {
-    case 'google': {
-      const container = document.querySelector<HTMLElement>('[data-signin-container="google"]')
-      if (!container) throw new Error('Google sign-in UI not ready')
-      container.innerHTML = ''
-      return renderGoogleSignInButton(container, deviceKeyId, provider.clientId)
-    }
+    case 'google':
+      // Google signs in by redirect (auth/googleRedirect): the page leaves, so there is no token to return here.
+      throw new Error('Google signs in by redirect')
     case 'microsoft': {
       // No 'common' fallback: microsoftProvider() refuses to build a config
       // without a pinned tenant, so signing in against a different tenant than

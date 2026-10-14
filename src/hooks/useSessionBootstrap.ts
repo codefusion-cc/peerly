@@ -17,6 +17,30 @@ import {
   type Session,
 } from '../session'
 import { migrateWorkspaceRouteIds } from '../collab/workspaceStore'
+import { DeviceIdentity } from '../collab/deviceIdentity'
+import { ensureOidcAvatar } from '../collab/avatarService'
+import { finishGoogleReturn, hasGoogleReturn, refreshGoogleQuietly, shouldRefreshGoogle } from '../auth/googleRedirect'
+
+/**
+ * A return from Google is stored before the first render, so nobody sees the login screen flash. Otherwise, a page
+ * load (nothing is under way yet: no call, no upload) may leave to refresh an aging Google token quietly; true when
+ * it does, and the page shows nothing until it is back.
+ */
+async function settleGoogleSignIn(): Promise<boolean> {
+  if (isE2eAuthBypass()) return false
+  const deviceKeyId = await new DeviceIdentity().publicKeyId()
+  if (hasGoogleReturn()) {
+    const credential = await finishGoogleReturn(deviceKeyId)
+    if (credential) {
+      await ensureOidcAvatar(credential.picture)
+      saveIdCredentials(credential.token, 'google', credential.email, await deriveUserId(credential.iss, credential.sub))
+    }
+    return false
+  }
+  const email = loadIdentityEmail()
+  const due = await shouldRefreshGoogle({ token: loadIdToken(), providerId: loadIdentityProvider(), email, deviceKeyId })
+  return due && email !== null && refreshGoogleQuietly({ deviceKeyId, email })
+}
 
 /**
  * Everything that has to be true before the first render decides anything.
@@ -78,6 +102,7 @@ export function useSessionBootstrap(): SessionBootstrap {
       await migrateLegacySession()
       await migrateSessionWorkspaceRouteId()
       await migrateWorkspaceRouteIds()
+      if (await settleGoogleSignIn()) return
 
       // A session without a live token is still a session: the user lands back
       // in their workspace and the ReauthBanner ('expired' phase) handles

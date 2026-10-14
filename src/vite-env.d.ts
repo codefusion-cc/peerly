@@ -12,7 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string
   readonly VITE_SUPABASE_ANON_KEY: string
   readonly VITE_GOOGLE_CLIENT_ID: string
-  readonly VITE_GOOGLE_AUTH_BRIDGE_ORIGIN: string
+  /** A stable origin whose Worker takes Google's redirect for branch previews (its callback is registered with Google). */
+  readonly VITE_GOOGLE_CALLBACK_ORIGIN?: string
   readonly VITE_MICROSOFT_CLIENT_ID: string
   readonly VITE_MICROSOFT_TENANT_ID: string
   readonly VITE_APPLE_CLIENT_ID: string

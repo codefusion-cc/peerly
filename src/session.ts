@@ -1,5 +1,6 @@
 import { DEFAULT_USER_COLOR } from './config'
-import { oidcTokenExpiryMs } from '@peerly/core'
+import { readIdTokenClaims } from '@codefusion-cc/google-sign-in'
+import { deviceTokenAcceptedUntil } from './auth/deviceToken'
 import { loadStoredProfile } from './collab/profileStore'
 import { migrateLegacyAvatarDataUrl, resolveAvatarPreview } from './collab/avatarService'
 import type { SignedAllowList } from './collab/allowList'
@@ -122,16 +123,15 @@ export function loadPersistedSession(): PersistedSession | null {
 }
 
 /**
- * Read `exp` without verifying the signature.
- *
- * That is safe *for this purpose only*: the question here is "is our own stored
- * token still worth presenting", not "should we trust this token". Every peer
- * re-verifies signature, issuer, audience, nonce and expiry before admitting
- * anyone, so a tampered `exp` buys nothing — it just means we try and get
- * rejected, exactly as if we hadn't checked. Never use this to make an
- * authorization decision; use verifyOidcIdToken.
+ * Until when our own stored token is worth presenting: 30 days after the provider issued it (auth/deviceToken),
+ * read without verifying the signature. That is safe *for this purpose only*: every peer and the Worker re-verify
+ * the token before admitting anyone, so a tampered `iat` buys nothing; we would just be refused. Null when the token
+ * does not say when it was issued. Never use this to make an authorization decision.
  */
-export const idTokenExpiryMs = oidcTokenExpiryMs
+export function idTokenUsableUntil(token: string): number | null {
+  const iat = readIdTokenClaims(token)?.iat
+  return typeof iat === 'number' && Number.isFinite(iat) ? deviceTokenAcceptedUntil(iat) : null
+}
 
 /**
  * ID tokens live about an hour. An expired token is treated as no token, but
@@ -150,8 +150,8 @@ export function loadIdToken(): string | null {
   const token = localStorage.getItem(ID_TOKEN_KEY)
   if (!token) return null
 
-  const expiresAt = idTokenExpiryMs(token)
-  if (expiresAt !== null && expiresAt <= Date.now()) {
+  const usableUntil = idTokenUsableUntil(token)
+  if (usableUntil !== null && usableUntil <= Date.now()) {
     clearIdToken()
     return null
   }

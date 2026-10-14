@@ -10,12 +10,13 @@ import {
 } from '@peerly/core'
 import { base64UrlToUtf8 } from '../utils/base64url'
 import { DeviceIdentity, type DeviceKeyId } from './deviceIdentity'
+import type { IdTokenClaims } from '@codefusion-cc/google-sign-in'
 import {
-  defaultJwksFetcher,
   getIdentityProvider,
+  verifyProviderToken,
   type IdentityProvider,
+  type JwksFetcher,
 } from './identityProviders'
-import { verifyOidcIdToken, type JwksFetcher, type OidcIdTokenClaims } from './oidcIdToken'
 import { isEmailAllowed, newerAllowList, verifyAllowList, type SignedAllowList } from './allowList'
 
 export { IDENTITY_DENIED_PREFIX }
@@ -52,7 +53,7 @@ export type IdentityHandshakeDeps = {
   /** `sameDevice`: the peer is another tab of this browser (it holds this device's key, under its own tab key). */
   onPeerVerified?: (
     peerId: string,
-    claims: OidcIdTokenClaims,
+    claims: IdTokenClaims,
     deviceKeyId: DeviceKeyId,
     tabKeyId: DeviceKeyId,
     sameDevice: boolean
@@ -141,29 +142,15 @@ export function createIdentityHandshake(deps: IdentityHandshakeDeps): PeerHandsh
     const provider = resolveProviderConfig(theirs.providerId, deps)
     if (!provider) deny(`unknown identity provider: ${theirs.providerId}`)
 
-    let claims: OidcIdTokenClaims
-    try {
-      const fetchJwks =
-        provider.fetchJwks ??
-        (theirs.providerId === 'google' && deps.fetchJwks
-          ? deps.fetchJwks
-          : defaultJwksFetcher(provider.jwksUrl))
-      claims = await verifyOidcIdToken(theirs.idToken, {
-        expectedAudience: provider.clientId,
-        expectedNonce: theirs.deviceKeyId,
-        issuers: provider.issuers,
-        fetchJwks,
-        jwksCacheKey: provider.id,
-        emailVerifiedClaim: provider.emailVerifiedClaim,
-      })
-    } catch (err) {
+    const keyed = !provider.fetchJwks && theirs.providerId === 'google' && deps.fetchJwks
+      ? { ...provider, fetchJwks: deps.fetchJwks }
+      : provider
+    const check = await verifyProviderToken(theirs.idToken, keyed, theirs.deviceKeyId)
+    if (!check.ok) {
       const claimed = unverifiedEmailClaim(theirs.idToken)
-      deny(
-        `ID token: ${err instanceof Error ? err.message : String(err)}${
-          claimed ? ` (peer claims to be ${claimed})` : ''
-        }`
-      )
+      deny(`ID token: ${check.problem}${claimed ? ` (peer claims to be ${claimed})` : ''}`)
     }
+    const claims = check.claims
 
     if (!(await verifyAllowList(theirs.allowList, deps.creatorKeyId, deps.workspaceSecret))) {
       deny('allow-list signature does not match this workspace')

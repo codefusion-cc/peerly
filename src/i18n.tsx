@@ -407,9 +407,20 @@ const plByEnglish: Record<string, string> = {
     'Zalogowano jako {actual}, ale ta przestrzeń dopuściła {expected}. Użyj tego samego konta.',
   'Your sign-in expired. Sign in again to reconnect securely.':
     'Twoje logowanie wygasło. Zaloguj się ponownie, aby bezpiecznie wznowić połączenie.',
-  'Your sign-in expires in a few minutes. Renew it to keep accepting new connections.':
-    'Twoje logowanie wygaśnie za kilka minut. Odnów je, aby nadal przyjmować nowe połączenia.',
+  'Your sign-in ends within a day. Sign in again to keep accepting new connections.':
+    'Twoje logowanie wygaśnie w ciągu doby. Zaloguj się ponownie, aby dalej przyjmować nowe połączenia.',
   'Sign in again': 'Zaloguj się ponownie',
+  'Opening Google': 'Otwieranie Google',
+  'Signing in needs this site’s storage. Allow site data for Peerly in your browser and try again.':
+    'Logowanie wymaga pamięci tej strony. Zezwól Peerly na zapisywanie danych w przeglądarce i spróbuj ponownie.',
+  'That sign-in took too long or started in another tab. Try again.':
+    'Logowanie trwało za długo albo zaczęło się w innej karcie. Spróbuj ponownie.',
+  'Couldn’t reach Google to check your sign-in. Check your connection and try again.':
+    'Nie udało się połączyć z Google, żeby sprawdzić logowanie. Sprawdź połączenie i spróbuj ponownie.',
+  'Google sign-in isn’t set up here.': 'Logowanie przez Google nie jest tu skonfigurowane.',
+  'You chose {chosen}, but Peerly is signed in as {kept}. Choose that account to stay signed in.':
+    'Wybrano {chosen}, ale Peerly jest zalogowane jako {kept}. Wybierz to konto, aby zachować logowanie.',
+  'Google sign-in didn’t finish. Try again.': 'Logowanie przez Google nie zostało dokończone. Spróbuj ponownie.',
   'Identity provider “{provider}” is not configured':
     'Dostawca tożsamości „{provider}” nie jest skonfigurowany',
   'Remove {email}': 'Usuń {email}',

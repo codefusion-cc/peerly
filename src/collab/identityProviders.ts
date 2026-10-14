@@ -1,6 +1,10 @@
-import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL } from '@peerly/core'
+import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, remoteKeys, type KeySet } from '@codefusion-cc/google-sign-in'
+import { GOOGLE_KEYS_PATH, pageGoogleKeys } from '@codefusion-cc/google-sign-in/browser'
+import { verifyDeviceIdToken, type DeviceTokenCheck } from '../auth/deviceToken'
 import { E2E_GOOGLE_CLIENT_ID, getE2eJwksFetcher, isE2eAuthBypass } from './e2eAuth'
-import type { JwksFetcher } from './oidcIdToken'
+
+/** A key set as a test or test mode hands it over: the JWKS document itself. */
+export type JwksFetcher = () => Promise<{ keys: JsonWebKey[] }>
 
 /**
  * GitHub is deliberately absent. Its OIDC discovery document
@@ -61,7 +65,7 @@ function googleProvider(): IdentityProvider | null {
       id: 'google',
       label: 'Google',
       clientId: E2E_GOOGLE_CLIENT_ID,
-      issuers: GOOGLE_ISSUERS,
+      issuers: new Set(GOOGLE_ISSUERS),
       jwksUrl: GOOGLE_JWKS_URL,
       fetchJwks: getE2eJwksFetcher(),
     }
@@ -73,7 +77,7 @@ function googleProvider(): IdentityProvider | null {
     id: 'google',
     label: 'Google',
     clientId,
-    issuers: GOOGLE_ISSUERS,
+    issuers: new Set(GOOGLE_ISSUERS),
     jwksUrl: GOOGLE_JWKS_URL,
   }
 }
@@ -199,10 +203,37 @@ export function requireIdentityConfigured(): void {
   }
 }
 
-export function defaultJwksFetcher(jwksUrl: string): JwksFetcher {
-  return async () => {
-    const res = await fetch(jwksUrl)
-    if (!res.ok) throw new Error(`Failed to fetch JWKS: HTTP ${res.status}`)
-    return res.json()
+const injectedKeys = new WeakMap<JwksFetcher, KeySet>()
+let googleKeys: KeySet | undefined
+
+/**
+ * The keys a provider's tokens are checked with: the injected document in tests and test mode, Google's from the
+ * Worker's copy first (for networks that reach Peerly but not googleapis.com), any other issuer's from its JWKS.
+ */
+export function providerKeys(provider: Pick<IdentityProvider, 'id' | 'jwksUrl' | 'fetchJwks'>): KeySet {
+  const injected = provider.fetchJwks
+  if (injected) {
+    let keys = injectedKeys.get(injected)
+    if (!keys) injectedKeys.set(injected, keys = remoteKeys(provider.jwksUrl, { fetch: async () => Response.json(await injected()) }))
+    return keys
   }
+  if (provider.id === 'google') return googleKeys ??= pageGoogleKeys({ proxyPath: GOOGLE_KEYS_PATH, storageKey: 'peerly-google-keys' })
+  return remoteKeys(provider.jwksUrl)
+}
+
+/** Verifies a token `provider` issued, bound to `deviceKeyId` (see auth/deviceToken). */
+export function verifyProviderToken(
+  token: string,
+  provider: IdentityProvider,
+  deviceKeyId: string,
+  now?: number
+): Promise<DeviceTokenCheck> {
+  return verifyDeviceIdToken(token, {
+    keys: providerKeys(provider),
+    issuers: provider.issuers ?? [],
+    audience: provider.clientId,
+    deviceKeyId,
+    emailVerifiedClaim: provider.emailVerifiedClaim,
+    now,
+  })
 }

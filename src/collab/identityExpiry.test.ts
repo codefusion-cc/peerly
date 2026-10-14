@@ -34,4 +34,8 @@ describe('msUntilPhaseChange', () => {
   it('never schedules sooner than a second, absorbing timer drift', () => {
     expect(msUntilPhaseChange(T, T - EXPIRY_WARN_MS + 10)).toBeGreaterThanOrEqual(1_000)
   })
+
+  it('a boundary beyond what a browser timer holds is checked again at the timer’s limit', () => {
+    expect(msUntilPhaseChange(T, T - 30 * 24 * 60 * 60_000)).toBe(2 ** 31 - 1)
+  })
 })

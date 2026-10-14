@@ -7,11 +7,13 @@ import {
 } from '../packages/core/worker/oidc.mjs'
 import { lookupRendezvous } from '../packages/core/worker/rendezvous.mjs'
 import { issueLobbyIdentity, verifyLobbyIdentity } from '../packages/core/worker/lobbyIdentity.mjs'
+import { DEVICE_TOKEN_MAX_AGE_MS, deviceSignInNonce } from '../src/auth/deviceToken.ts'
+import { deriveUserId } from '../src/collab/userId.ts'
 
 const b64url = bytes => Buffer.from(bytes).toString('base64url')
 const jsonPart = value => b64url(new TextEncoder().encode(JSON.stringify(value)))
 
-async function fixture() {
+async function fixture({ issuedAt = Date.now(), bindTo, iss = 'https://accounts.google.com' } = {}) {
   const rsa = await crypto.subtle.generateKey(
     { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
     true,
@@ -31,14 +33,14 @@ async function fixture() {
   const deviceKeyId = `P-256:${deviceJwk.x}:${deviceJwk.y}`
   const now = Date.now()
   const claims = {
-    iss: 'https://accounts.google.com',
+    iss,
     aud: 'client-id',
     sub: 'subject',
     email: 'user@example.com',
     email_verified: true,
-    nonce: deviceKeyId,
-    iat: Math.floor(now / 1000),
-    exp: Math.floor(now / 1000) + 3600,
+    nonce: deviceSignInNonce(bindTo ?? deviceKeyId),
+    iat: Math.floor(issuedAt / 1000),
+    exp: Math.floor(issuedAt / 1000) + 3600,
   }
   const head = jsonPart({ alg: 'RS256', kid: 'test-key', typ: 'JWT' })
   const body = jsonPart(claims)
@@ -197,16 +199,55 @@ describe('identity worker', () => {
     await expect(lookupRendezvous(makeRequest(), env).then(response => response.status)).resolves.toBe(429)
   })
 
-  it('uses a bounded last-good JWKS during a transient provider outage', async () => {
-    const { rsaJwk, token } = await fixture()
+  it('accepts a device-bound token past Google’s exp for 30 days after iat, and refuses it after', async () => {
     const provider = resolveOidcProvider('google', { VITE_GOOGLE_CLIENT_ID: 'client-id' })
-    const fetcher = vi.fn()
-      .mockResolvedValueOnce(Response.json({ keys: [rsaJwk] }))
-      .mockRejectedValueOnce(new Error('temporary network failure'))
-    const first = await verifyOidcToken(token, provider, fetcher)
-    const second = await verifyOidcToken(token, provider, fetcher, Date.now() + 6 * 60_000)
-    expect(first.sub).toBe('subject')
-    expect(second.sub).toBe('subject')
-    expect(fetcher).toHaveBeenCalledTimes(2)
+    const day = 24 * 60 * 60_000
+    const old = await fixture({ issuedAt: Date.now() - 29 * day })
+    const fetcher = async () => Response.json({ keys: [old.rsaJwk] })
+    const deviceKeyId = old.headers['x-peerly-device-key']
+    expect((await verifyOidcToken(old.token, provider, deviceKeyId, fetcher)).sub).toBe('subject')
+    const tooOld = await fixture({ issuedAt: Date.now() - DEVICE_TOKEN_MAX_AGE_MS - 60_000 })
+    await expect(verifyOidcToken(tooOld.token, provider, tooOld.headers['x-peerly-device-key'],
+      async () => Response.json({ keys: [tooOld.rsaJwk] }))).rejects.toThrow('too-old')
+  })
+
+  it('refuses a token whose nonce names another device, even with that device’s signature', async () => {
+    const provider = resolveOidcProvider('google', { VITE_GOOGLE_CLIENT_ID: 'client-id' })
+    const stolen = await fixture({ bindTo: 'P-256:someone-elses-key-xxxxxxxxx:yyyyyyyyyyyyyyyyyyyyyyyyy' })
+    await expect(verifyOidcToken(stolen.token, provider, stolen.headers['x-peerly-device-key'],
+      async () => Response.json({ keys: [stolen.rsaJwk] }))).rejects.toThrow('device')
+  })
+
+  it('certifies the same user id for both of Google’s issuer spellings, the one the page derives', async () => {
+    const ids = []
+    for (const iss of ['https://accounts.google.com', 'accounts.google.com']) {
+      const { rsaJwk, headers, devicePrivateKey } = await fixture({ iss })
+      const routes = createIdentityRoutes({ fetcher: async () => Response.json({ keys: [rsaJwk] }) })
+      const proof = new TextEncoder().encode(['peerly-app-identity-v1', 'google', headers['x-peerly-device-key'],
+        headers['x-peerly-request-ts'], headers['x-peerly-request-nonce']].join('\n'))
+      const signature = b64url(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, devicePrivateKey, proof))
+      const response = await routes.issue(new Request('https://app.example/api/identity/issue', { method: 'POST',
+        headers: { ...headers, 'x-peerly-request-signature': signature } }), { VITE_GOOGLE_CLIENT_ID: 'client-id',
+        IDENTITY_SECRET: 'synthetic-identity-secret', IDENTITY_RATE_LIMITER: { limit: async () => ({ success: true }) } })
+      ids.push((await response.json()).userId)
+    }
+    expect(ids[0]).toBe(ids[1])
+    expect(ids[0]).toBe(await deriveUserId('https://accounts.google.com', 'subject'))
+  })
+
+  it('caps a certificate issued from an old token at the token’s 30 days', async () => {
+    const issuedAt = Date.now() - DEVICE_TOKEN_MAX_AGE_MS + 60_000
+    const { rsaJwk, headers, devicePrivateKey } = await fixture({ issuedAt })
+    const routes = createIdentityRoutes({ fetcher: async () => Response.json({ keys: [rsaJwk] }) })
+    const proof = new TextEncoder().encode(['peerly-app-identity-v1', 'google', headers['x-peerly-device-key'],
+      headers['x-peerly-request-ts'], headers['x-peerly-request-nonce']].join('\n'))
+    const signature = b64url(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, devicePrivateKey, proof))
+    const env = { VITE_GOOGLE_CLIENT_ID: 'client-id', IDENTITY_SECRET: 'synthetic-identity-secret',
+      IDENTITY_RATE_LIMITER: { limit: async () => ({ success: true }) } }
+    const response = await routes.issue(new Request('https://app.example/api/identity/issue', { method: 'POST',
+      headers: { ...headers, 'x-peerly-request-signature': signature } }), env)
+    expect(response.status).toBe(200)
+    const identity = await response.json()
+    expect(identity.expiresAt).toBe(Math.floor(issuedAt / 1000) * 1000 + DEVICE_TOKEN_MAX_AGE_MS)
   })
 })

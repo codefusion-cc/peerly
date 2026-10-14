@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { deviceSignInNonce } from '../auth/deviceToken'
+import { describe, expect, it } from 'vitest'
 import type { DataPayload } from '@trystero-p2p/core'
 import type { KvStore } from '../utils/kvStore'
 import { utf8ToBase64Url, bytesToBase64Url } from '../utils/base64url'
 import { DeviceIdentity, verifyWithDeviceKeyId } from './deviceIdentity'
 import { signAllowList, verifyAllowList, workspaceAuthorityScope, type SignedAllowList } from './allowList'
-import { resetJwksCache, type JwkWithKid, type JwksFetcher } from './googleIdToken'
+import type { JwksFetcher } from './identityProviders'
+
+type JwkWithKid = JsonWebKey & { kid?: string }
 import { OLDER_PEER_REASON, STALE_TAB_REASON, TabSession, UNKNOWN_SIBLING_REASON } from '@peerly/core'
 import { fakeBrowser } from './testing/fakeBrowserTabs'
 import { createIdentityHandshake, IDENTITY_DENIED_PREFIX, type Attestation } from './identityHandshake'
@@ -48,7 +51,7 @@ async function makeFakeGoogle() {
       // Real providers assert this and the app requires it; overridable so
       // tests can exercise the unverified-email rejection.
       email_verified: true,
-      nonce,
+      nonce: deviceSignInNonce(nonce),
       iat: nowSec,
       exp: nowSec + 3600,
       ...overrides,
@@ -174,10 +177,6 @@ function expectHandshakeError(
   const errors = [results.a, results.b].filter(r => !r.ok).map(r => r.error ?? '')
   expect(errors.some(error => error.includes(substring))).toBe(true)
 }
-
-beforeEach(() => {
-  resetJwksCache()
-})
 
 describe('identity handshake', () => {
   it('accepts two members whose emails are both on a validly-signed allow-list', async () => {
@@ -517,7 +516,7 @@ describe('identity handshake', () => {
 
     expect(a.ok).toBe(false)
     expect(b.ok).toBe(false)
-    expect(a.ok ? '' : a.error).toMatch(/not verified/i)
+    expect(a.ok ? '' : a.error).toMatch(/ID token: email-unverified/)
   })
 
   it('denies a token carrying only preferred_username, which is not a verified email', async () => {
@@ -550,6 +549,7 @@ describe('identity handshake', () => {
         // one. It must not be accepted as proof of the address.
         getAttestation: async () => ({
           idToken: await google.issueToken('', malloryKeyId, {
+            sub: 'mallory-subject',
             email: undefined,
             email_verified: undefined,
             preferred_username: 'alice@example.com',
@@ -566,7 +566,7 @@ describe('identity handshake', () => {
 
     expect(a.ok).toBe(false)
     expect(b.ok).toBe(false)
-    expect(a.ok ? '' : a.error).toMatch(/missing an email claim/i)
+    expect(a.ok ? '' : a.error).toMatch(/ID token: email$/)
   })
 
   it('denies an expired token even with a correct nonce and allow-list membership', async () => {

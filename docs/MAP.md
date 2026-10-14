@@ -6,9 +6,10 @@ Per-screen behavior is in [views.md](views.md); several tabs of one browser in [
 ## Layout
 
 - `src/` the app. `App.tsx` session bootstrap and workspace routing, `routing.ts`, `config.ts` build config, `session.ts`, `i18n.tsx`.
+- `src/auth/` sign-in: Google's redirect (`googleRedirect.ts`) and the device-bound token rule shared by page and Worker (`deviceToken.ts`).
 - `src/collab/` app policy: workspace stores, creator-signed allow-lists (`allowList.ts`), message signing, identity providers, DM and friends stores, mesh (`mesh.ts`), sibling tabs and once-per-browser attention (`browserTabs.ts`).
 - `src/components/` UI (join, workspace, chat, files, `VideoCall.tsx`), `src/hooks/` room, collab and auth wiring (`useCollab.ts`, `useRoom.ts`), `src/context/` collab context, `src/protocol/` message types and mappers, `src/realtime/content.ts` DO content client.
-- `packages/core/` published `@peerly/core`: generic rooms, signaling, device identity, per-tab session keys (`tabSession.ts`), peer handshake (`peerIdentityHandshake.ts`), OIDC checks, media, `worker/` (Google auth, rendezvous, `realtime/` DO runtime), `src/realtime/` (DO signaling client, ICE servers). The app imports it from source through an alias.
+- `packages/core/` published `@peerly/core`: generic rooms, signaling, device identity, per-tab session keys (`tabSession.ts`), peer handshake (`peerIdentityHandshake.ts`), OIDC checks, media, `worker/` (OIDC checks, rendezvous, `realtime/` DO runtime), `src/realtime/` (DO signaling client, ICE servers). The app imports it from source through an alias.
 - `worker/index.mjs` the Worker for production and preview (API routes, assets, media health cron); `worker/realtime/` Peerly's DO classes (`gateway.mjs`, `lobbyChannel.mjs`, `contentChannel.mjs`, `commands/`) and Cloudflare TURN credentials (`ice.mjs`); `worker/console/` the `ConsoleAdmin` entrypoint CodeFusion Console binds, and its manifest of Worker secrets; `worker/usageWatch.mjs` with `wrangler.usage-watch.jsonc`.
 - `server/` dev server (`dev.mjs`, Nostr signaling) and E2E server (`test-server.mjs p2p|durable-objects`).
 - `e2e/` Playwright specs, `scripts/` bundle and CSP guards, Nostr relay check, `verify-production.mjs`, version bump. `docs/` implementation notes.
@@ -16,7 +17,7 @@ Per-screen behavior is in [views.md](views.md); several tabs of one browser in [
 
 ## Main flows
 
-- Sign-in: `src/collab/providerSignIn.ts` -> provider ID token -> `/api/auth/google/*` (`packages/core/worker/googleAuth.mjs`) or verified in the browser -> device key in IndexedDB. Each tab adds an in-memory tab key the device key certifies; workspace handshakes (`src/collab/identityHandshake.ts`) prove possession with it, so tabs of one browser are distinct peers.
+- Sign-in: Google by full-page redirect (`src/auth/googleRedirect.ts`, `@codefusion-cc/google-sign-in`; the Worker serves `/api/auth/google/callback` and Google's keys at `/api/auth/google/jwks`), other providers by popup (`src/collab/providerSignIn.ts`). The token's nonce names the device key and it is accepted for 30 days after `iat` by the page, peers and the Worker (`src/auth/deviceToken.ts`, read by `packages/core/worker/oidc.mjs`); a page load quietly refreshes an aging Google token (`useSessionBootstrap`). Each tab adds an in-memory tab key the device key certifies; workspace handshakes (`src/collab/identityHandshake.ts`) prove possession with it, so tabs of one browser are distinct peers.
 - Production chat: `src/hooks/useRoom.ts` -> `@peerly/core` `joinRoom` -> `SignalScopeDO` signaling (`packages/core/src/realtime/signaling.ts`) -> WebRTC peers; messages signed (`src/collab/messageSigning.ts`), stored in localStorage.
 - Session and ICE: `/api/network/session` -> session cookie plus `ice: { servers, ttlMs }` from `worker/realtime/ice.mjs` (Cloudflare STUN, one-hour TURN credentials). `/api/media/health` and the five-minute cron check the TURN key.
 - Preview (DO content): `src/realtime/content.ts` -> `/api/realtime/*` -> `handleRealtimeRoute` -> `UserGateway`, lobby and content channel DOs (`worker/realtime/`) -> DO SQLite.
@@ -47,4 +48,4 @@ Per-screen behavior is in [views.md](views.md); several tabs of one browser in [
 - TURN secrets (`TURN_KEY_ID`, `TURN_KEY_API_TOKEN`) are provisioned through CodeFusion Console, never set by hand.
 - Workspace semantics (allow-lists, handshakes, history sanitization) stay in `src/collab`, not in `packages/core`. Generic code goes to the package.
 - Node 24.18.0 / npm 11.16.0 are enforced (`.nvmrc`, `.npmrc`, CI); a mismatch exits early.
-- Google sign-in on branch previews needs `VITE_GOOGLE_AUTH_BRIDGE_ORIGIN` (README "Testing branches with Google sign-in").
+- Google sign-in on branch previews needs `VITE_GOOGLE_CALLBACK_ORIGIN` (README "Testing branches with Google sign-in"), and every origin's `/api/auth/google/callback` registered with the Google client.
