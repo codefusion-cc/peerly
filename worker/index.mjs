@@ -1,7 +1,7 @@
 import { checkMediaHealth, handleMediaHealth, MEDIA_HEALTH_PATH, turnConfigured } from '@codefusion-cc/realtime-media'
 import { GOOGLE_KEYS_PATH, handleGoogleSignIn } from '@codefusion-cc/google-sign-in'
 import {
-  createIdentityRoutes, handleRealtimeRoute, prepareAuthenticatedRealtimeUpgrade, retryOnReset,
+  createIdentityRoutes, gatewayFor, handleRealtimeRoute, prepareAuthenticatedRealtimeUpgrade, retryOnReset,
 } from '@codefusion-cc/realtime'
 import { lookupRendezvous } from '../packages/core/worker/rendezvous.mjs'
 import { issueLobbyIdentity, verifyLobbyIdentity } from '../packages/core/worker/lobbyIdentity.mjs'
@@ -74,7 +74,7 @@ function originAllowedBy(env) {
 const identityRoutes = createIdentityRoutes({
   app: APP_ID,
   allowedOrigin: (origin, env) => originAllowedBy(env)(origin),
-  validateSession: (env, auth, proof) => env.USER_GATEWAYS.getByName(`${APP_ID}:${auth.uid}`)
+  validateSession: (env, auth, proof) => gatewayFor(env, APP_ID, auth.uid)
     .useSessionProof({ ...proof, uid: auth.uid, sid: auth.sid, dk: auth.deviceKeyId }),
   secret: env => env.NETWORK_SESSION_SECRET,
   limiter: env => env.IDENTITY_RATE_LIMITER,
