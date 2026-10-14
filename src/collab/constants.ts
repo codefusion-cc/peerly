@@ -33,6 +33,9 @@ export const FILE_TOO_LARGE_ERROR = `Files must be smaller than ${
   MAX_FILE_BYTES / (1024 * 1024)
 } MB.`
 
+/** A file picked before the workspace connected, or after it dropped: nothing was shared. */
+export const FILES_NEED_CONNECTION_ERROR = 'Not connected yet, so the file was not shared. Try again in a moment.'
+
 export const RELAY_OFFLINE_ERROR =
   'Nostr signaling is offline. Check your internet connection and try again.'
 

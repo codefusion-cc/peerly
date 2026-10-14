@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from '@playwright/test'
+import { expect, test, type Browser, type Locator, type Page } from '@playwright/test'
 import { createHash } from 'node:crypto'
 import {
   E2E_ALLOW_LIST,
@@ -222,6 +222,16 @@ export async function leaveToPicker(page: Page) {
   // The workspace rail's Direct Messages / Home button closes the workspace.
   await page.getByTestId('rail-home').click()
   await expect(page.getByTestId('home-view')).toBeVisible({ timeout: 15_000 })
+}
+
+/**
+ * Shares files from the channel composer as a person does: once its attach
+ * button is enabled, which is when the workspace can send them. The hidden
+ * input itself takes files at any moment, earlier than anyone could pick them.
+ */
+export async function attachFiles(page: Page, files: Parameters<Locator['setInputFiles']>[0]) {
+  await expect(page.getByTestId('attach-file-button')).toBeEnabled({ timeout: 25_000 })
+  await page.getByTestId('file-input').setInputFiles(files)
 }
 
 export async function waitForSignaling(page: Page) {
