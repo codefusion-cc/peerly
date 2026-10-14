@@ -10,3 +10,10 @@ condition = "AND"
 paths = ['''^src/consent\.ts$''']
 regexTarget = "secret"
 regexes = ['''^peerly-legal-consent-v1$''']
+
+[[rules.allowlists]]
+description = "Test-only secrets the frozen pre-move session tokens were minted with; never deployed"
+condition = "AND"
+paths = ['''^worker/realtime/legacySessions\.workers\.test\.mjs$''']
+regexTarget = "secret"
+regexes = ['''^legacy-(session|opaque)-secret-0123456789abcdef$''']
