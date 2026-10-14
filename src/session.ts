@@ -1,5 +1,6 @@
 import { DEFAULT_USER_COLOR } from './config'
-import { oidcTokenExpiryMs } from '@peerly/core'
+import { readIdTokenClaims } from '@codefusion-cc/google-sign-in'
+import { deviceTokenAcceptedUntil } from './auth/deviceToken'
 import { loadStoredProfile } from './collab/profileStore'
 import { migrateLegacyAvatarDataUrl, resolveAvatarPreview } from './collab/avatarService'
 import type { SignedAllowList } from './collab/allowList'
@@ -49,23 +50,23 @@ const PERSIST_KEY = 'peerly-session'
  *   force a fresh sign-in. It was session-scoped on the reasoning that a
  *   bearer credential should not survive a restart; that traded a real,
  *   constant cost — signing in again every single time — against a narrow
- *   benefit, because the token is short-lived anyway (~1h) and every peer
- *   re-verifies it rather than trusting our copy. What actually bounds the
- *   exposure is that expiry, not where the string sat. Changed deliberately,
- *   2026-07-28.
+ *   benefit: the token is bound to this device's key (auth/deviceToken), so a
+ *   copy is useless without it, and every peer re-verifies it rather than
+ *   trusting ours. Changed deliberately, 2026-07-28.
  * - The identity METADATA (email, provider, durable userId) is not a
  *   credential — it only drives what the UI offers (your workspaces, whose
  *   name, which provider to re-auth with). Peers never trust it; they verify
  *   the token itself in the handshake.
  *
- * A stored token is only half of "sign in once": tokens expire hourly, so
- * useIdentityRenewal keeps a live one without asking. Without that, this
- * storage change only moves the interruption from restart to the next hour.
+ * A token is accepted for 30 days after it was issued (auth/deviceToken), and
+ * a page load quietly refreshes an aging Google one (auth/googleRedirect).
  */
 const ID_TOKEN_KEY = 'peerly-id-token'
 const ID_USER_ID_KEY = 'peerly-id-user-id'
 const ID_PROVIDER_KEY = 'peerly-id-provider'
 const ID_EMAIL_KEY = 'peerly-id-email'
+/** The provider's display name for the account, the default name in a workspace joined next. */
+const ID_NAME_KEY = 'peerly-id-name'
 
 /** Read identity metadata from localStorage, migrating any pre-split value. */
 function readIdentityValue(key: string): string | null {
@@ -122,20 +123,19 @@ export function loadPersistedSession(): PersistedSession | null {
 }
 
 /**
- * Read `exp` without verifying the signature.
- *
- * That is safe *for this purpose only*: the question here is "is our own stored
- * token still worth presenting", not "should we trust this token". Every peer
- * re-verifies signature, issuer, audience, nonce and expiry before admitting
- * anyone, so a tampered `exp` buys nothing — it just means we try and get
- * rejected, exactly as if we hadn't checked. Never use this to make an
- * authorization decision; use verifyOidcIdToken.
+ * Until when our own stored token is worth presenting: 30 days after the provider issued it (auth/deviceToken),
+ * read without verifying the signature. That is safe *for this purpose only*: every peer and the Worker re-verify
+ * the token before admitting anyone, so a tampered `iat` buys nothing; we would just be refused. Null when the token
+ * does not say when it was issued. Never use this to make an authorization decision.
  */
-export const idTokenExpiryMs = oidcTokenExpiryMs
+export function idTokenUsableUntil(token: string): number | null {
+  const iat = readIdTokenClaims(token)?.iat
+  return typeof iat === 'number' && Number.isFinite(iat) ? deviceTokenAcceptedUntil(iat) : null
+}
 
 /**
- * ID tokens live about an hour. An expired token is treated as no token, but
- * ONLY the token is dropped — the identity metadata (who you are) survives so
+ * A token past its 30 days is treated as no token, but ONLY the token is
+ * dropped — the identity metadata (who you are) survives so
  * the workspace stays open and the ReauthBanner can offer a one-click renewal
  * with the same account, instead of dumping the user back to the join screen.
  */
@@ -150,8 +150,8 @@ export function loadIdToken(): string | null {
   const token = localStorage.getItem(ID_TOKEN_KEY)
   if (!token) return null
 
-  const expiresAt = idTokenExpiryMs(token)
-  if (expiresAt !== null && expiresAt <= Date.now()) {
+  const usableUntil = idTokenUsableUntil(token)
+  if (usableUntil !== null && usableUntil <= Date.now()) {
     clearIdToken()
     return null
   }
@@ -205,6 +205,16 @@ export function saveIdCredentials(
   }
 }
 
+/** The display name the provider gave for the signed-in account, kept for the next workspace's default name. */
+export function saveIdentityName(name: string | undefined): void {
+  if (name) localStorage.setItem(ID_NAME_KEY, name)
+  else localStorage.removeItem(ID_NAME_KEY)
+}
+
+export function loadIdentityName(): string | null {
+  return localStorage.getItem(ID_NAME_KEY)
+}
+
 export function loadIdentityUserId(): string | null {
   return readIdentityValue(ID_USER_ID_KEY)
 }
@@ -212,7 +222,7 @@ export function loadIdentityUserId(): string | null {
 /** Full sign-out: token AND identity metadata, from both storages. */
 export function clearIdCredentials(): void {
   clearIdToken()
-  for (const key of [ID_USER_ID_KEY, ID_PROVIDER_KEY, ID_EMAIL_KEY]) {
+  for (const key of [ID_USER_ID_KEY, ID_PROVIDER_KEY, ID_EMAIL_KEY, ID_NAME_KEY]) {
     sessionStorage.removeItem(key)
     localStorage.removeItem(key)
   }
@@ -249,7 +259,7 @@ export function loadSignedInIdentity(): StoredIdentity | null {
 }
 
 /**
- * The open workspace, independent of ID-token freshness. Tokens live ~1h; the
+ * The open workspace, independent of ID-token freshness. Tokens end; the
  * workspace session must not — everything needed to come back (workspace
  * secret, allow-list, profile) is durable, message signing uses the device
  * key, and only NEW peer handshakes need a live token. A reload past token

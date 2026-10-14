@@ -3,7 +3,9 @@ import { verifyAllowList } from './allowList'
 import type { KvStore } from '../utils/kvStore'
 import { getE2eInvite, issueE2eGoogleToken, E2E_GOOGLE_CLIENT_ID, getE2eJwksFetcher } from './e2eAuth'
 import { DeviceIdentity } from './deviceIdentity'
-import { verifyGoogleIdToken } from './googleIdToken'
+import { GOOGLE_ISSUERS } from '@codefusion-cc/google-sign-in'
+import { deviceSignInNonce, verifyDeviceIdToken } from '../auth/deviceToken'
+import { providerKeys } from './identityProviders'
 
 function memoryStore(): KvStore<CryptoKeyPair> {
   const map = new Map<string, CryptoKeyPair>()
@@ -35,24 +37,30 @@ describe('e2eAuth', () => {
     it('issues a Google token bound to a device key', async () => {
       const identity = new DeviceIdentity(memoryStore())
       const keyId = await identity.publicKeyId()
-      const token = await issueE2eGoogleToken('alice@e2e.test', keyId)
-      const claims = await verifyGoogleIdToken(token, {
-        expectedAudience: E2E_GOOGLE_CLIENT_ID,
-        expectedNonce: keyId,
-        fetchJwks: getE2eJwksFetcher(),
+      const token = await issueE2eGoogleToken('alice@e2e.test', deviceSignInNonce(keyId))
+      const check = await verifyDeviceIdToken(token, {
+        keys: providerKeys({ id: 'google', jwksUrl: 'https://e2e.invalid/jwks', fetchJwks: getE2eJwksFetcher() }),
+        issuers: GOOGLE_ISSUERS,
+        audience: E2E_GOOGLE_CLIENT_ID,
+        deviceKeyId: keyId,
       })
+      if (!check.ok) throw new Error(check.problem)
+      const { claims } = check
       expect(claims.email).toBe('alice@e2e.test')
     })
 
     it('mints tokens that assert a verified email, like a real provider', async () => {
       const identity = new DeviceIdentity(memoryStore())
       const keyId = await identity.publicKeyId()
-      const token = await issueE2eGoogleToken('alice@e2e.test', keyId)
-      const claims = await verifyGoogleIdToken(token, {
-        expectedAudience: E2E_GOOGLE_CLIENT_ID,
-        expectedNonce: keyId,
-        fetchJwks: getE2eJwksFetcher(),
+      const token = await issueE2eGoogleToken('alice@e2e.test', deviceSignInNonce(keyId))
+      const check = await verifyDeviceIdToken(token, {
+        keys: providerKeys({ id: 'google', jwksUrl: 'https://e2e.invalid/jwks', fetchJwks: getE2eJwksFetcher() }),
+        issuers: GOOGLE_ISSUERS,
+        audience: E2E_GOOGLE_CLIENT_ID,
+        deviceKeyId: keyId,
       })
+      if (!check.ok) throw new Error(check.problem)
+      const { claims } = check
       // If the fake issuer stopped asserting this, E2E would silently stop
       // exercising the real email_verified path that production depends on.
       expect(claims.email_verified).toBe(true)

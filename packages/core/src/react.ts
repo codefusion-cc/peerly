@@ -15,13 +15,6 @@ import {
 import { firstSafeLink } from './safeLinks.js'
 import { searchReactionCategories } from './reactions.js'
 import {
-  credentialNeedsRenewal,
-  credentialRenewalDelay,
-  credentialRetryDelay,
-  DEFAULT_CREDENTIAL_RENEW_BEFORE_MS,
-  DEFAULT_CREDENTIAL_RETRY_MS,
-} from './credentialRenewal.js'
-import {
   loadClockFormat,
   loadDateFormat,
   saveClockFormat,
@@ -208,112 +201,6 @@ export function useMessageActionMenu(options: MessageActionMenuOptions) {
     closePanel,
     togglePanel,
   }
-}
-
-export type CredentialRenewalOptions<T> = {
-  enabled: boolean
-  /** Verified credential expiry in epoch milliseconds; null means missing. */
-  expiresAt: number | null
-  renew(): Promise<T | null>
-  onRenewed(value: T): void
-  onExpired?(): void
-  /** Keep retrying after a missing/expired credential. */
-  retryWhenMissing?: boolean
-  renewBeforeMs?: number
-  retryMs?: number
-}
-
-/**
- * App-agnostic credential lifecycle: proactive renewal, bounded retry, tab
- * wake-up handling, and expiry notification. Credential acquisition and
- * storage remain consumer-owned.
- */
-export function useCredentialRenewal<T>(
-  options: CredentialRenewalOptions<T>
-): number {
-  const renewRef = useLatest(options.renew)
-  const onRenewedRef = useLatest(options.onRenewed)
-  const onExpiredRef = useLatest(options.onExpired)
-  const [renewalVersion, setRenewalVersion] = useState(0)
-  const {
-    enabled,
-    expiresAt,
-    retryWhenMissing = false,
-    renewBeforeMs = DEFAULT_CREDENTIAL_RENEW_BEFORE_MS,
-    retryMs = DEFAULT_CREDENTIAL_RETRY_MS,
-  } = options
-
-  useEffect(() => {
-    if (!enabled) return
-
-    let cancelled = false
-    let running = false
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const policy = { renewBeforeMs, retryMs }
-
-    const schedule = (delay: number): void => {
-      clearTimeout(timer)
-      timer = setTimeout(run, delay)
-    }
-
-    const handleUnavailable = (): void => {
-      if (cancelled) return
-      if (expiresAt === null && !retryWhenMissing) return
-      const retryDelay = credentialRetryDelay(expiresAt, Date.now(), policy)
-      if (retryDelay !== null) {
-        schedule(retryDelay)
-        return
-      }
-      onExpiredRef.current?.()
-      if (retryWhenMissing) schedule(retryMs)
-    }
-
-    const run = (): void => {
-      if (running || cancelled) return
-      running = true
-      void renewRef.current()
-        .then(value => {
-          if (cancelled) return
-          if (value === null) {
-            handleUnavailable()
-            return
-          }
-          onRenewedRef.current(value)
-          setRenewalVersion(version => version + 1)
-        })
-        .catch(handleUnavailable)
-        .finally(() => {
-          running = false
-        })
-    }
-
-    schedule(credentialRenewalDelay(expiresAt, Date.now(), policy))
-
-    const onVisible = (): void => {
-      if (
-        document.visibilityState === 'visible'
-        && credentialNeedsRenewal(expiresAt, Date.now(), policy)
-      ) run()
-    }
-    document.addEventListener('visibilitychange', onVisible)
-
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-      document.removeEventListener('visibilitychange', onVisible)
-    }
-  }, [
-    enabled,
-    expiresAt,
-    onExpiredRef,
-    onRenewedRef,
-    renewBeforeMs,
-    renewRef,
-    retryMs,
-    retryWhenMissing,
-  ])
-
-  return renewalVersion
 }
 
 export type BrowserHistoryOptions = {

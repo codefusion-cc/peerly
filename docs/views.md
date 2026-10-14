@@ -111,7 +111,7 @@ can still be present (signed in, between workspaces).
 
 | Step | What happens |
 |------|----------------|
-| Sign in | OIDC via [`IdentityLoginButtons`](../src/components/IdentityLoginButtons.tsx) / provider modules under `collab/` |
+| Sign in | Google by full-page redirect ([`auth/googleRedirect`](../src/auth/googleRedirect.ts)), back to where it started; other providers by popup, all from [`IdentityLoginButtons`](../src/components/IdentityLoginButtons.tsx) |
 | Name workspace + optional guest emails | Creator’s email is always on the list |
 | Submit | `WorkspaceAuthManager.createInvite` → signed allow-list + new `workspaceId` |
 | Result | Session saved, workspace remembered, invite link generated (`encodeInviteLink`), enter workspace |

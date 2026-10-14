@@ -7,6 +7,10 @@ import { initializeTheme } from './collab/themePreference.ts'
 import { I18nProvider } from './i18n.tsx'
 import { ClockFormatProvider } from '@peerly/core/react'
 import { APP_STORAGE_SCOPE } from './config.ts'
+import { takeGoogleReturn } from './auth/googleRedirect.ts'
+
+// A return from Google sign-in leaves /login for where it started before anything reads the address.
+takeGoogleReturn()
 
 // Apply the saved/system theme before React paints to avoid a light-mode flash.
 initializeTheme()

@@ -1,5 +1,5 @@
 import { checkMediaHealth, handleMediaHealth, MEDIA_HEALTH_PATH, turnConfigured } from '@codefusion-cc/realtime-media'
-import { handleGoogleAuthRoute } from '../packages/core/worker/googleAuth.mjs'
+import { GOOGLE_KEYS_PATH, handleGoogleSignIn } from '@codefusion-cc/google-sign-in'
 import { lookupRendezvous } from '../packages/core/worker/rendezvous.mjs'
 import { issueLobbyIdentity, verifyLobbyIdentity } from '../packages/core/worker/lobbyIdentity.mjs'
 import { handleRealtimeRoute } from '../packages/core/worker/realtime/index.mjs'
@@ -30,17 +30,19 @@ export function allowedAuthParent(origin) {
       // both are staging names on our own zone. See the matching comment in
       // HeyHubs' worker/index.mjs.
       /^[a-z0-9-]+-preview\.peerly\.cc$/i.test(url.hostname) ||
-      /^[a-z0-9-]+-peerly\.codefusion\.workers?\.dev$/i.test(url.hostname)
+      /^[a-z0-9-]+-peerly\.codefusion\.workers\.dev$/i.test(url.hostname)
     )
   } catch {
     return false
   }
 }
 
-const authConfig = {
-  allowedParent: allowedAuthParent,
-  messageType: 'peerly-google-auth-credential',
-  title: 'Peerly preview sign-in',
+/** The page Google sends the browser back to, in Peerly's background (themePreference.ts) so the hop never flashes. */
+const googleCallbackPage = {
+  background: { light: '#f8f8ff', dark: '#111221' },
+  title: 'Signing in to Peerly…',
+  failed: 'Sign-in didn’t finish.',
+  back: 'Back to sign-in',
 }
 
 /**
@@ -108,8 +110,15 @@ export default {
     }
     const realtimeResponse = await handleRealtimeRoute(request, env, realtimeConfig)
     if (realtimeResponse) return realtimeResponse
-    const authResponse = await handleGoogleAuthRoute(request, env, context, authConfig)
-    return authResponse ?? env.ASSETS.fetch(request)
+    // Google's redirect comes back through here for this origin and for branch previews and the E2E harness, which
+    // sign in through a stable origin (VITE_GOOGLE_CALLBACK_ORIGIN); the token only ever goes to an allowed origin.
+    const signIn = await handleGoogleSignIn(request, {
+      allowedOrigin: originAllowedBy(env),
+      keysPath: GOOGLE_KEYS_PATH,
+      page: googleCallbackPage,
+      context,
+    })
+    return signIn ?? env.ASSETS.fetch(request)
   },
 
   /**

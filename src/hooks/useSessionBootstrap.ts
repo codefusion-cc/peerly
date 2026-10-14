@@ -13,10 +13,36 @@ import {
   migrateLegacySession,
   migrateSessionWorkspaceRouteId,
   saveIdCredentials,
+  saveIdentityName,
   saveSession,
   type Session,
 } from '../session'
 import { migrateWorkspaceRouteIds } from '../collab/workspaceStore'
+import { DeviceIdentity } from '../collab/deviceIdentity'
+import { ensureOidcAvatar } from '../collab/avatarService'
+import { settleGoogleAtLoad } from '../auth/googleRedirect'
+
+/**
+ * A return from Google is stored before the first render, so nobody sees the login screen flash; or the page leaves
+ * to refresh an aging Google token (auth/googleRedirect). True when it leaves: the page shows nothing until it is
+ * back.
+ */
+async function settleGoogleSignIn(): Promise<boolean> {
+  if (isE2eAuthBypass()) return false
+  const settled = await settleGoogleAtLoad({
+    deviceKeyId: await new DeviceIdentity().publicKeyId(),
+    token: loadIdToken(),
+    providerId: loadIdentityProvider(),
+    email: loadIdentityEmail(),
+  })
+  if (settled.kind === 'stored') {
+    const { credential } = settled
+    await ensureOidcAvatar(credential.picture)
+    saveIdCredentials(credential.token, 'google', credential.email, await deriveUserId(credential.iss, credential.sub))
+    saveIdentityName(credential.name)
+  }
+  return settled.kind === 'leaving'
+}
 
 /**
  * Everything that has to be true before the first render decides anything.
@@ -78,6 +104,12 @@ export function useSessionBootstrap(): SessionBootstrap {
       await migrateLegacySession()
       await migrateSessionWorkspaceRouteId()
       await migrateWorkspaceRouteIds()
+      if (await settleGoogleSignIn()) {
+        // Back from Google by the Back button, this load comes out of the back-forward cache never having rendered:
+        // load it again (the try is recorded, so it does not leave a second time).
+        window.addEventListener('pageshow', event => { if (event.persisted) location.reload() }, { once: true })
+        return
+      }
 
       // A session without a live token is still a session: the user lands back
       // in their workspace and the ReauthBanner ('expired' phase) handles

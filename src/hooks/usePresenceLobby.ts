@@ -6,7 +6,6 @@ import {
   PRESENCE_INTERVAL_MS,
   signControl,
   verifySignedControl,
-  verifyOidcDeviceBinding,
   type OidcDeviceAttestation,
   type PresencePayload,
   type SignedControl,
@@ -14,7 +13,8 @@ import {
 import { useLatest, useRelayChannel } from '@peerly/core/react'
 import { NETWORK_APP_ID, PUBLIC_NETWORK_ENV } from '../config'
 import type { DeviceIdentity } from '../collab/deviceIdentity'
-import { defaultJwksFetcher, getIdentityProvider } from '../collab/identityProviders'
+import { getIdentityProvider, verifyProviderToken } from '../collab/identityProviders'
+import { deriveUserId } from '../collab/userId'
 import {
   createFriendInvite,
   createFriendInviteResponse,
@@ -190,28 +190,16 @@ export function usePresenceLobby({
       fromUserId: string
       fromEmail?: string
     }) => {
-      const provider = getIdentityProvider(value.attestation.providerId)
-      if (!provider) return null
-      const binding = await verifyOidcDeviceBinding(
-        value.attestation,
-        {
-          providerId: provider.id,
-          deviceKeyId: value.deviceKeyId,
-          userId: value.fromUserId,
-        },
-        {
-          expectedAudience: provider.clientId,
-          issuers: provider.issuers,
-          fetchJwks: provider.fetchJwks ?? defaultJwksFetcher(provider.jwksUrl),
-          jwksCacheKey: provider.id,
-          emailVerifiedClaim: provider.emailVerifiedClaim,
-        }
-      )
-      if (!binding) return null
-      if (value.fromEmail && normalizeEmail(binding.claims.email) !== normalizeEmail(value.fromEmail)) {
+      const { providerId, idToken } = value.attestation ?? {}
+      const provider = typeof providerId === 'string' ? getIdentityProvider(providerId) : undefined
+      if (!provider || typeof idToken !== 'string') return null
+      const check = await verifyProviderToken(idToken, provider, value.deviceKeyId)
+      if (!check.ok) return null
+      if (await deriveUserId(check.claims.iss, check.claims.sub) !== value.fromUserId) return null
+      if (value.fromEmail && normalizeEmail(check.claims.email) !== normalizeEmail(value.fromEmail)) {
         return null
       }
-      return binding
+      return { claims: check.claims }
     }
 
     const privateActions = createPrivateLobbyActions(room)

@@ -7,6 +7,7 @@
  * The test serves `jwks()` at `jwksUrl` from its own fetch mock, next to
  * whatever other outside service it fakes.
  */
+import { deviceSignInNonce } from '../../../../src/auth/deviceToken.ts'
 
 const base64Url = bytes =>
   btoa(String.fromCharCode(...new Uint8Array(bytes)))
@@ -89,7 +90,7 @@ export async function createTestAccounts({ issuer, clientId, app, origin }) {
    */
   async function signIn(handle, email, subject) {
     const device = await createDevice()
-    const token = await mintIdToken({ email, nonce: device.deviceKeyId, subject })
+    const token = await mintIdToken({ email, nonce: deviceSignInNonce(device.deviceKeyId), subject })
     const enroll = await handle(await signedRequest('/api/network/enroll', device, 'realtime-enroll-v1',
       { provider: 'oidc', token }))
     if (enroll.status !== 200) throw new Error(`enroll: HTTP ${enroll.status}`)

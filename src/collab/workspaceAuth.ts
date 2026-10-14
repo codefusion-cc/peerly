@@ -11,13 +11,15 @@ import {
   isE2eAuthBypass,
   E2E_GOOGLE_CLIENT_ID,
 } from './e2eAuth'
+import { GOOGLE_ISSUERS, type IdTokenClaims } from '@codefusion-cc/google-sign-in'
+import { deviceSignInNonce } from '../auth/deviceToken'
 import {
-  defaultJwksFetcher,
   getIdentityProvider,
+  verifyProviderToken,
   type IdentityProvider,
   type IdentityProviderId,
+  type JwksFetcher,
 } from './identityProviders'
-import { verifyOidcIdToken, type JwksFetcher, type OidcIdTokenClaims } from './oidcIdToken'
 import { signedMessageBytes, type SignedFields } from './messageSigning'
 import { signedReactionBytes, type SignedReactionFields } from './reactionSigning'
 import { createIdentityHandshake, type IdentityHandshakeDeps } from './identityHandshake'
@@ -104,47 +106,38 @@ export class WorkspaceAuthManager {
     }
   }
 
+  /** Checks a token this device signed in with (bound to its key, see auth/deviceToken) and keeps it. */
   async verifyAndStoreIdToken(
     token: string,
     providerId: IdentityProviderId
-  ): Promise<OidcIdTokenClaims> {
+  ): Promise<IdTokenClaims> {
     const keyId = await this.deviceKeyId()
     const provider = getE2eProvider(providerId) ?? getIdentityProvider(providerId)
     if (!provider) {
       throw new Error(`Identity provider "${providerId}" is not configured`)
     }
-
-    const fetchJwks =
-      provider.fetchJwks ??
-      (providerId === 'google' && this.fetchJwks
-        ? this.fetchJwks
-        : defaultJwksFetcher(provider.jwksUrl))
-
-    const claims = await verifyOidcIdToken(token, {
-      expectedAudience: provider.clientId,
-      expectedNonce: keyId,
-      issuers: provider.issuers,
-      fetchJwks,
-      jwksCacheKey: provider.id,
-      emailVerifiedClaim: provider.emailVerifiedClaim,
-    })
+    const keyed = !provider.fetchJwks && providerId === 'google' && this.fetchJwks
+      ? { ...provider, fetchJwks: this.fetchJwks }
+      : provider
+    const check = await verifyProviderToken(token, keyed, keyId)
+    if (!check.ok) throw new Error(`Sign-in was refused (${check.problem})`)
     this.idToken = token
     this.identityProvider = providerId
-    return claims
+    return check.claims
   }
 
-  async signInWithE2eEmail(email: string): Promise<OidcIdTokenClaims> {
+  async signInWithE2eEmail(email: string): Promise<IdTokenClaims> {
     if (!isE2eAuthBypass()) {
       throw new Error('E2E auth bypass is not enabled')
     }
-    const keyId = await this.deviceKeyId()
-    // The nonce is the device key id throughout: it is the binding the worker
-    // enforces, so a token minted for one device cannot enrol another.
+    // The nonce names the device key, as a real sign-in's does: it is the
+    // binding the worker enforces, so a token minted for one device cannot enrol another.
+    const nonce = deviceSignInNonce(await this.deviceKeyId())
     const oidc = e2eOidcTarget()
     if (oidc) {
-      return this.verifyAndStoreIdToken(await issueE2eOidcToken(oidc, email, keyId), 'oidc')
+      return this.verifyAndStoreIdToken(await issueE2eOidcToken(oidc, email, nonce), 'oidc')
     }
-    return this.verifyAndStoreIdToken(await issueE2eGoogleToken(email, keyId), 'google')
+    return this.verifyAndStoreIdToken(await issueE2eGoogleToken(email, nonce), 'google')
   }
 
   buildPeerHandshake(handlers?: {
@@ -286,7 +279,7 @@ function getE2eProvider(providerId: string): IdentityProvider | null {
     id: 'google',
     label: 'Google',
     clientId: E2E_GOOGLE_CLIENT_ID,
-    issuers: new Set(['https://accounts.google.com', 'accounts.google.com']),
+    issuers: new Set(GOOGLE_ISSUERS),
     jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs',
     fetchJwks: getE2eJwksFetcher(),
   }

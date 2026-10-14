@@ -107,11 +107,11 @@ in `.env`, then restart the dev server.
 ### Google
 
 1. [Google Cloud console](https://console.cloud.google.com/apis/credentials) → **Create credentials → OAuth client ID → Web application**.
-2. **Authorized JavaScript origins**: every origin the app is served from — `http://localhost:5173` for dev, plus your production origin. No redirect URI is needed (Google Identity Services returns the token via callback).
+2. **Authorized redirect URIs**: `https://<origin>/api/auth/google/callback` for every origin that serves the Worker (`https://peerly.cc`, `https://preview.peerly.cc`). Sign-in is a full-page redirect ([`@codefusion-cc/google-sign-in`](https://www.npmjs.com/package/@codefusion-cc/google-sign-in)): no Google script and no FedCM, so it also works in embedded browsers.
 3. Configure the OAuth consent screen (External is fine; while in *Testing* only listed test users can sign in).
 4. Copy the client ID → `VITE_GOOGLE_CLIENT_ID`.
 
-When a Google token approaches expiry, Peerly prepares a fresh same-account sign-in button in the workspace banner. [Google Identity Services does not provide a truly silent sign-in flow](https://developers.google.com/identity/gsi/web/guides/offerings); credentials are returned through privacy-preserving automatic or manual UI.
+The token's nonce names the device key (`<deviceKeyId>.<random>`), and every use of it comes with a signature by that key, so peers and the Worker accept it for 30 days after Google issued it (`src/auth/deviceToken.ts`), not just Google's hour. A page load with a Google token over three days old asks Google again without a prompt, at most once a day; while the person stays signed in to Google they never see a sign-in again. An open tab also checks its own token as peers do (when it opens, when the person comes back, every six hours): one under a key Google withdrew reads as ended, and the next load refreshes it. Otherwise the workspace banner offers a sign-in before the 30 days end; during a call or a file transfer it first says what leaving would end.
 
 ### Microsoft
 
@@ -239,24 +239,13 @@ Register the production origin (`https://peerly.cc`) in each OAuth provider's al
 
 ### Testing branches with Google sign-in
 
-Google OAuth requires exact JavaScript origins and does not accept a wildcard
-for Cloudflare's per-branch URLs. Set `VITE_GOOGLE_AUTH_BRIDGE_ORIGIN` on
-preview builds to render the Google button through your stable auth hostname.
-The bridge returns the ID token directly to the requesting preview with an
-origin-locked `postMessage`; the preview still verifies the token and its
-device-key nonce locally. If the variable is absent, regular direct Google
-sign-in is used.
-
-One-time setup:
-
-1. Attach a stable custom domain to this Worker in Cloudflare. Domain routing
-   is intentionally kept out of the repository.
-2. Add the same `VITE_GOOGLE_CLIENT_ID` value as a Worker runtime variable.
-   Cloudflare build variables are not exposed to Worker code at runtime.
-3. Add your stable auth origin to the Google web client's **Authorized
-   JavaScript origins**. No redirect URI is needed.
-4. Set `VITE_GOOGLE_AUTH_BRIDGE_ORIGIN` and `VITE_GOOGLE_CLIENT_ID` for
-   Cloudflare preview builds.
+Google accepts only exact redirect URIs, not a wildcard for Cloudflare's
+per-branch URLs. Set `VITE_GOOGLE_CALLBACK_ORIGIN` on preview builds to a
+stable origin whose Worker takes Google's redirect (`https://preview.peerly.cc`).
+That Worker hands the token on only to the login page of an origin
+`allowedAuthParent` in `worker/index.mjs` accepts, and the preview still
+verifies the token and its device-key nonce itself. Without the variable each
+origin takes its own redirect.
 
 ### CodeFusion Console
 

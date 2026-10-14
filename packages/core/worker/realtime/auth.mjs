@@ -5,7 +5,7 @@ import {
   verifyCapability, verifyCookie, verifyDeviceSignature,
 } from './crypto.mjs'
 import { LIMITS } from '../../dist/protocol/index.js'
-import { deriveUserId } from '../../dist/userId.js'
+import { deriveUserId } from '@codefusion-cc/realtime/browser'
 
 function json(body, init) {
   return Response.json(body, {
@@ -132,13 +132,12 @@ export async function handleEnroll(request, env, config) {
   const now = Date.now()
   let claims
   try {
-    claims = await verifyOidcToken(token, provider, fetch, now)
+    // The token's nonce must name this device key, binding "Google says
+    // someone owns this email" to "this specific device key".
+    claims = await verifyOidcToken(token, provider, deviceKeyId, fetch, now)
   } catch {
     return unauthorized()
   }
-  // The OIDC token must have been requested with nonce = deviceKeyId, binding
-  // "Google says someone owns this email" to "this specific device key".
-  if (claims.nonce !== deviceKeyId) return unauthorized()
 
   const proof = await verifyDeviceSignature(
     request.headers,

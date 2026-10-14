@@ -30,9 +30,6 @@
     "./worker/lobby-identity": {
       "default": "./worker/lobbyIdentity.mjs"
     },
-    "./worker/google-auth": {
-      "default": "./worker/googleAuth.mjs"
-    },
     "./worker/realtime": {
       "default": "./worker/realtime/index.mjs"
     },

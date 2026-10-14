@@ -1,3 +1,2 @@
-// Moved to @peerly/core so other apps can share it; re-exported here so
-// existing imports keep working.
-export { deriveUserId } from '@peerly/core'
+// The id the Worker derives too (@codefusion-cc/realtime): Google's two issuer spellings are one account.
+export { deriveUserId } from '@codefusion-cc/realtime/browser'

@@ -1,4 +1,5 @@
 import { test, expect, type Browser } from '@playwright/test'
+import { DEVICE_TOKEN_MAX_AGE_MS } from '../src/auth/deviceToken'
 import {
   joinWorkspace,
   createWorkspace,
@@ -314,10 +315,11 @@ test.describe('Peerly P2P collaboration', () => {
     await joinWorkspace(page, { name: 'Alice', email: 'alice@e2e.test' })
     await expect(page.getByTestId('reauth-banner')).toHaveCount(0)
 
-    // Rewrite the stored token's exp to 60s out — inside the warning window.
-    // The signature becomes invalid, which is fine: banner display reads only
-    // exp; the fresh token minted by re-auth is what handshakes would use.
-    await page.evaluate(() => {
+    // Rewrite the stored token's iat so its 30 days (src/auth/deviceToken.ts)
+    // end in a minute — inside the warning window. The signature becomes
+    // invalid, which is fine: banner display reads only iat; the fresh token
+    // minted by re-auth is what handshakes would use.
+    await page.evaluate(maxAgeSeconds => {
       const token = localStorage.getItem('peerly-id-token')
       if (!token) throw new Error('no stored token')
       const [header, payload, sig] = token.split('.')
@@ -326,14 +328,15 @@ test.describe('Peerly P2P collaboration', () => {
       const encode = (value: unknown) =>
         btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
       const claims = decode(payload)
-      claims.exp = Math.floor(Date.now() / 1000) + 60
+      claims.iat = Math.floor(Date.now() / 1000) - maxAgeSeconds + 60
+      claims.exp = claims.iat + 3600
       localStorage.setItem('peerly-id-token', `${header}.${encode(claims)}.${sig}`)
-    })
+    }, DEVICE_TOKEN_MAX_AGE_MS / 1000)
     await page.reload()
     await waitForWorkspace(page)
 
     await expect(page.getByTestId('reauth-banner')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByTestId('reauth-banner')).toContainText('expires in a few minutes')
+    await expect(page.getByTestId('reauth-banner')).toContainText('ends within a day')
 
     await page.getByTestId('reauth-button').click()
     await expect(page.getByTestId('reauth-banner')).toHaveCount(0, { timeout: 15_000 })
@@ -345,12 +348,12 @@ test.describe('Peerly P2P collaboration', () => {
 
   test('an expired sign-in leaves the room until re-auth restores it', async ({ page }) => {
     // Real time must pass for the token to lapse in place — but only ~15s of
-    // it: the ok→expired transition is identical wherever exp sits.
+    // it: the ok→expired transition is identical wherever the 30 days end.
     test.setTimeout(60_000)
     await joinWorkspace(page, { name: 'Alice', email: 'alice@e2e.test' })
     await waitForSignaling(page)
 
-    await page.evaluate(() => {
+    await page.evaluate(maxAgeSeconds => {
       const token = localStorage.getItem('peerly-id-token')
       if (!token) throw new Error('no stored token')
       const [header, payload, sig] = token.split('.')
@@ -359,16 +362,17 @@ test.describe('Peerly P2P collaboration', () => {
       const encode = (value: unknown) =>
         btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
       const claims = decode(payload)
-      claims.exp = Math.floor(Date.now() / 1000) + 15
+      claims.iat = Math.floor(Date.now() / 1000) - maxAgeSeconds + 15
+      claims.exp = claims.iat + 3600
       localStorage.setItem('peerly-id-token', `${header}.${encode(claims)}.${sig}`)
-    })
+    }, DEVICE_TOKEN_MAX_AGE_MS / 1000)
     await page.reload()
     await waitForWorkspace(page)
     await expect(page.getByTestId('signaling-info')).toContainText('signaling endpoint', {
       timeout: 15_000,
     })
 
-    // Once exp passes, this device must LEAVE the room — staying would present
+    // Once the 30 days pass, this device must LEAVE the room — staying would present
     // a dead token to every newcomer's handshake, producing an error storm on
     // both sides ("identity verification failed: ID token: Token expired").
     await expect(page.getByTestId('signaling-info')).toContainText('Connecting to signaling', {

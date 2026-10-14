@@ -1,5 +1,6 @@
 import { resolveOidcProvider, verifyDevicePayload, verifyOidcToken } from './oidc.mjs'
-import { deriveUserId } from '../dist/userId.js'
+import { deriveUserId } from '@codefusion-cc/realtime/browser'
+import { deviceTokenAcceptedUntil } from '../../../src/auth/deviceToken.ts'
 
 const TTL_MS = 5 * 60_000
 const headers = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }
@@ -23,8 +24,8 @@ async function issue(request, env) {
     const authorization = request.headers.get('authorization') ?? ''
     if (!provider || !authorization.startsWith('Bearer ')) throw new Error('unauthorized')
     const now = Date.now()
-    const claims = await verifyOidcToken(authorization.slice(7), provider, fetcher ?? fetch, now)
     const deviceKeyId = request.headers.get('x-peerly-device-key') ?? ''
+    const claims = await verifyOidcToken(authorization.slice(7), provider, deviceKeyId, fetcher ?? fetch, now)
     const proof = bytes([PURPOSE, providerId, deviceKeyId,
       request.headers.get('x-peerly-request-ts'), request.headers.get('x-peerly-request-nonce')].join('\n'))
     if (!await verifyDevicePayload(request.headers, claims, proof, now)) throw new Error('unauthorized')
@@ -37,7 +38,7 @@ async function issue(request, env) {
       deviceKeyId,
       ...(rendezvous ? { rendezvousId } : {}),
       issuedAt: now,
-      expiresAt: Math.min(now + TTL_MS, claims.exp * 1000),
+      expiresAt: Math.min(now + TTL_MS, deviceTokenAcceptedUntil(claims.iat)),
     }
     // Scope the MAC to this protocol and origin; lookup capabilities are not certificates.
     const body = encode(bytes(JSON.stringify(identity)))

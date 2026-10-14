@@ -1,22 +1,27 @@
+import { DEVICE_TOKEN_MAX_AGE_MS } from './auth/deviceToken'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  clearIdCredentials,
   createSessionFromInvite,
   leaveWorkspace,
   loadIdentityEmail,
+  loadIdentityName,
   loadIdentityProvider,
   loadIdToken,
   loadPersistedSession,
   loadSession,
   migrateSessionWorkspaceRouteId,
   saveIdCredentials,
+  saveIdentityName,
   saveSession,
 } from './session'
 import { utf8ToBase64Url } from './utils/base64url'
 
 /** Shapes just enough of a JWT for the expiry check; signature is irrelevant here. */
-function tokenExpiringAt(expSeconds: number): string {
+/** A token Google issued at `iatSeconds`, expiring an hour later as Google's do. */
+function tokenIssuedAt(iatSeconds: number): string {
   const header = utf8ToBase64Url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
-  const payload = utf8ToBase64Url(JSON.stringify({ email: 'alice@example.com', exp: expSeconds }))
+  const payload = utf8ToBase64Url(JSON.stringify({ email: 'alice@example.com', iat: iatSeconds, exp: iatSeconds + 3600 }))
   return `${header}.${payload}.not-a-real-signature`
 }
 
@@ -134,44 +139,54 @@ describe('session persistence', () => {
   })
 })
 
-describe('stored ID token expiry', () => {
+describe('stored ID token lifetime', () => {
   const nowSec = () => Math.floor(Date.now() / 1000)
+  const maxAgeSec = DEVICE_TOKEN_MAX_AGE_MS / 1000
 
-  // ID tokens last ~1h. A stale one made the UI claim "signed in", then every
-  // peer rejected the handshake on an expired token — which reads as a broken
-  // app rather than "sign in again".
-  it('treats an expired token as no token, but keeps identity metadata', () => {
-    saveIdCredentials(tokenExpiringAt(nowSec() - 60), 'google', 'alice@example.com')
+  // A device-bound token is accepted for 30 days after Google issued it. A token past that made the UI claim
+  // "signed in", then every peer rejected the handshake, which reads as a broken app rather than "sign in again".
+  it('drops a token past its 30 days, but keeps identity metadata', () => {
+    saveIdCredentials(tokenIssuedAt(nowSec() - maxAgeSec - 60), 'google', 'alice@example.com')
 
     expect(loadIdToken()).toBeNull()
-    // Metadata survives: the ReauthBanner needs the provider/email to offer a
-    // one-click renewal with the same account.
+    // Metadata survives: the ReauthBanner and the quiet refresh need the provider and email.
     expect(loadIdentityProvider()).toBe('google')
     expect(loadIdentityEmail()).toBe('alice@example.com')
   })
 
-  it('keeps a token that is still valid', () => {
-    const token = tokenExpiringAt(nowSec() + 3600)
+  it('keeps a token past Google’s one-hour exp while it is under 30 days old', () => {
+    const token = tokenIssuedAt(nowSec() - 2 * 3600)
     saveIdCredentials(token, 'google', 'alice@example.com')
-
     expect(loadIdToken()).toBe(token)
+
+    const lastMinute = tokenIssuedAt(nowSec() - maxAgeSec + 60)
+    saveIdCredentials(lastMinute, 'google', 'alice@example.com')
+    expect(loadIdToken()).toBe(lastMinute)
   })
 
-  it('restores the session even when the token has expired', () => {
-    // The workspace outlives the ~1h token: the user lands back inside and the
-    // ReauthBanner ('expired' phase) handles getting a fresh token — instead
-    // of a reload past expiry reading as a full logout.
+  it('restores the session even when the token is gone', () => {
+    // The workspace outlives the token: the user lands back inside and the ReauthBanner ('expired' phase) handles
+    // getting a fresh one, instead of a reload reading as a full logout.
     saveSession(createSessionFromInvite(TEST_INVITE, 'alice@example.com', 'google'))
-    saveIdCredentials(tokenExpiringAt(nowSec() - 1), 'google', 'alice@example.com')
+    saveIdCredentials(tokenIssuedAt(nowSec() - maxAgeSec - 1), 'google', 'alice@example.com')
 
     expect(loadSession()?.workspaceId).toBe(TEST_INVITE.workspaceId)
     expect(loadIdToken()).toBeNull()
   })
 
-  it('keeps an opaque token without an exp rather than locking the user out', () => {
-    // Not all issuers are JWT-shaped; absence of a readable exp is not evidence
-    // of expiry, and the peer handshake still enforces the real one.
+  it('keeps an opaque token without an iat rather than locking the user out', () => {
+    // Not all issuers are JWT-shaped; absence of a readable iat is not evidence of age, and peers still enforce it.
     saveIdCredentials('not-a-jwt', 'google', 'alice@example.com')
     expect(loadIdToken()).toBe('not-a-jwt')
+  })
+})
+
+describe('the provider’s display name', () => {
+  it('is kept beside the identity and goes with it at sign-out', () => {
+    saveIdCredentials('token', 'google', 'ada@example.com')
+    saveIdentityName('Ada Lovelace')
+    expect(loadIdentityName()).toBe('Ada Lovelace')
+    clearIdCredentials()
+    expect(loadIdentityName()).toBeNull()
   })
 })

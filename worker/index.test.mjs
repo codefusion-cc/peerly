@@ -5,6 +5,7 @@ import * as workerModule from './index.mjs'
 import worker, { allowedAuthParent } from './index.mjs'
 import { resolveContentBackend } from '../src/config.ts'
 import { readWranglerConfig } from './testing/wranglerConfig.mjs'
+import { signInState } from '@codefusion-cc/google-sign-in/testing'
 
 const previewConfig = readWranglerConfig('wrangler.preview.jsonc')
 const productionConfig = readWranglerConfig('wrangler.jsonc')
@@ -111,12 +112,13 @@ describe('media health', () => {
   })
 })
 
-describe('Peerly auth bridge parent validation', () => {
+describe('Peerly sign-in origins and Google’s return', () => {
   it('accepts production and exact HTTPS Peerly branch preview origins', () => {
     expect(allowedAuthParent('https://peerly.cc')).toBe(true)
     expect(allowedAuthParent('https://preview.peerly.cc')).toBe(true)
     expect(allowedAuthParent('https://fix-auth-peerly.codefusion.workers.dev')).toBe(true)
-    expect(allowedAuthParent('https://fix-auth-peerly.codefusion.worker.dev')).toBe(true)
+    // worker.dev is not Cloudflare's: someone else owns it, and a sign-in must never hand them a token.
+    expect(allowedAuthParent('https://fix-auth-peerly.codefusion.worker.dev')).toBe(false)
     expect(allowedAuthParent('http://fix-auth-peerly.codefusion.workers.dev')).toBe(false)
     expect(allowedAuthParent('https://fix-auth-peerly.codefusion.workers.dev/path')).toBe(false)
     expect(allowedAuthParent('https://fix-auth-peerly.codefusion.workers.dev.evil.test')).toBe(false)
@@ -129,38 +131,36 @@ describe('Peerly auth bridge parent validation', () => {
     expect(allowedAuthParent('https://evil.dev-preview.peerly.cc')).toBe(false)
   })
 
-  it('enforces the parent allowlist before serving the bridge', async () => {
-    const params = new URLSearchParams({
-      parent_origin: 'https://evil.test',
-      client_id: 'client.apps.googleusercontent.com',
-      nonce: 'device-key',
-      state: 'request-state',
-    })
-    const response = await worker.fetch(
-      new Request(`https://auth.example.test/api/auth/google/bridge?${params}`),
-      { VITE_GOOGLE_CLIENT_ID: 'client.apps.googleusercontent.com' },
-      {}
-    )
-    expect(response.status).toBe(400)
+  const handOff = (state, { site = 'same-origin', token = 'aaa.bbb.ccc' } = {}) => worker.fetch(
+    new Request('https://peerly.cc/api/auth/google/callback', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'sec-fetch-site': site },
+      body: new URLSearchParams({ state, id_token: token }),
+    }),
+    productionConfig.vars,
+    { waitUntil() {} }
+  )
+
+  it('serves Google’s return page in Peerly’s background, scripts allowed by hash only', async () => {
+    const response = await worker.fetch(new Request('https://peerly.cc/api/auth/google/callback'), productionConfig.vars, { waitUntil() {} })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-security-policy')).toMatch(/^default-src 'none'/)
+    const html = await response.text()
+    expect(html).toContain('#111221')
+    expect(html).toContain('Signing in to Peerly…')
   })
 
-  it('serves silent renewal mode only to an allowed parent', async () => {
-    const params = new URLSearchParams({
-      parent_origin: 'https://preview.peerly.cc',
-      client_id: 'client.apps.googleusercontent.com',
-      nonce: 'device-key',
-      state: 'request-state',
-      mode: 'silent',
-    })
-    const response = await worker.fetch(
-      new Request(`https://auth.example.test/api/auth/google/bridge?${params}`),
-      { VITE_GOOGLE_CLIENT_ID: 'client.apps.googleusercontent.com' },
-      {}
-    )
-    expect(response.status).toBe(200)
-    const html = await response.text()
-    expect(html).toContain('"silent":true')
-    expect(html).toContain('google.accounts.id.prompt')
-    expect(html).not.toContain('auto_select:false')
+  it('hands a token on only to the login page of Peerly or an allowed preview', async () => {
+    const own = await handOff(signInState('https://peerly.cc', '/login'))
+    expect(new URL((await own.json()).location).origin).toBe('https://peerly.cc')
+    const preview = await handOff(signInState('https://fix-auth-peerly.codefusion.workers.dev', '/login'))
+    const location = new URL((await preview.json()).location)
+    expect(location.origin).toBe('https://fix-auth-peerly.codefusion.workers.dev')
+    expect(new URLSearchParams(location.hash.slice(1)).get('google_id_token')).toBe('aaa.bbb.ccc')
+
+    expect((await handOff(signInState('https://evil.test', '/login'))).status).toBe(400)
+    expect((await handOff(signInState('https://x-peerly.codefusion.worker.dev', '/login'))).status).toBe(400)
+    expect((await handOff(signInState('https://peerly.cc', '/workspace/x'))).status).toBe(400)
+    expect((await handOff(signInState('https://peerly.cc', '/login'), { site: 'cross-site' })).status).toBe(403)
   })
 })

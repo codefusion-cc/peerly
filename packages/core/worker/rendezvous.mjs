@@ -48,8 +48,8 @@ export async function lookupRendezvous(request, env) {
     const provider = resolveOidcProvider(providerId, env)
     if (!token || !provider) throw new Error('unauthorized')
     const now = Date.now()
-    const claims = await verifyOidcToken(token, provider, fetch, now)
     const deviceKeyId = request.headers.get('x-peerly-device-key') ?? ''
+    const claims = await verifyOidcToken(token, provider, deviceKeyId, fetch, now)
     const timestamp = Number(request.headers.get('x-peerly-request-ts') ?? '')
     const nonce = request.headers.get('x-peerly-request-nonce') ?? ''
     const proof = await verifyDevicePayload(

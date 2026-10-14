@@ -1,4 +1,4 @@
-import type { JwksFetcher } from './oidcIdToken'
+import type { JwksFetcher } from './identityProviders'
 import type { WorkspaceInvite } from './inviteLink'
 import {
   E2E_ALLOW_LIST,

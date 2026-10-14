@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { deriveUserId as previousDeriveUserId } from '@peerly/core'
 import { deriveUserId } from './userId'
 
 describe('deriveUserId', () => {
@@ -15,5 +16,15 @@ describe('deriveUserId', () => {
     const microsoft = await deriveUserId('https://login.microsoftonline.com/x/v2.0', '12345')
     expect(google).not.toBe(otherSub)
     expect(google).not.toBe(microsoft)
+  })
+
+  it('gives Google’s two issuer spellings one id, as the Worker does', async () => {
+    expect(await deriveUserId('accounts.google.com', '12345')).toBe(await deriveUserId('https://accounts.google.com', '12345'))
+  })
+
+  it('keeps every id people already have: the same hash as before for any other issuer string', async () => {
+    for (const iss of ['https://accounts.google.com', 'https://login.microsoftonline.com/x/v2.0', 'https://appleid.apple.com']) {
+      expect(await deriveUserId(iss, 'subject-1')).toBe(await previousDeriveUserId(iss, 'subject-1'))
+    }
   })
 })
