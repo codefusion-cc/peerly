@@ -36,6 +36,7 @@ import { loadFileBlob, saveFileBlob } from '../utils/fileStore'
 import { BlobUrlRegistry } from '../utils/blobUrls'
 import { safeThumbnailUrl } from '../utils/avatarUrl'
 import { authorizeDmContent } from '../realtime/content'
+import { useTransferHold } from '../updates'
 
 const CHAT_SCHEME = 'peerly-gdm-v2'
 const MAX_TEXT = 4000
@@ -87,6 +88,7 @@ export function useGlobalDmChat({
   const [historyReady, setHistoryReady] = useConversationState(scope, () => false)
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({})
   const [transfers, setTransfers] = useState<GlobalDmTransfer[]>([])
+  useTransferHold(transfers)
   const [peerCount, setPeerCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const messagesRef = useRef(messages)

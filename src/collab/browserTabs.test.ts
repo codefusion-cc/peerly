@@ -1,5 +1,7 @@
+import { watchAppUpdates } from '@codefusion-cc/app-update/browser'
+import { testPage } from '@codefusion-cc/app-update/testing'
 import { afterEach, describe, expect, it } from 'vitest'
-import { BrowserTabs } from './browserTabs'
+import { BrowserTabs, type LocksLike } from './browserTabs'
 import { fakeBrowser } from './testing/fakeBrowserTabs'
 
 const opened: BrowserTabs[] = []
@@ -113,5 +115,47 @@ describe('attention once per browser', () => {
     track(browser.tab())
     await expect(first.claim('dm:general:a')).resolves.toBe(true)
     await expect(first.claim('dm:general:b')).resolves.toBe(true)
+  })
+})
+
+describe('next to @codefusion-cc/app-update', () => {
+  /** `navigator.locks` as the browser has it: methods on the prototype, so app-update wraps `request` on the instance. */
+  function browserLocks(browser: ReturnType<typeof fakeBrowser>): LocksLike {
+    class BrowserLockManager {
+      request(...args: Parameters<LocksLike['request']>) { return browser.locks.request(...args) }
+      query() { return browser.locks.query() }
+    }
+    return new BrowserLockManager()
+  }
+
+  it('a tab open for its whole life still reloads into a newer build, and keeps its life lock until then', async () => {
+    const browser = fakeBrowser()
+    const locks = browserLocks(browser)
+    const page = testPage({ deployed: 'b'.repeat(40) })
+    const updates = watchAppUpdates({ current: 'a'.repeat(40), storageKey: 'peerly-update', reloadWhenIdle: true }, { ...page.env, locks: locks as unknown as Pick<LockManager, 'request'> })
+    try {
+      const tab = track(new BrowserTabs({ channel: null, locks }))
+      await page.settle()
+      expect(browser.locks.held.has(`peerly-tab:${tab.tabId}`)).toBe(true)
+      expect(page.reloads).toBe(1)
+    } finally {
+      updates.stop()
+    }
+  })
+
+  it('a claim still holds the reload while its lock is held', async () => {
+    const browser = fakeBrowser()
+    const locks = browserLocks(browser)
+    const page = testPage({ deployed: null })
+    const updates = watchAppUpdates({ current: 'a'.repeat(40), storageKey: 'peerly-update', reloadWhenIdle: true }, { ...page.env, locks: locks as unknown as Pick<LockManager, 'request'> })
+    try {
+      const tab = track(new BrowserTabs({ channel: null, locks, claimHoldMs: 60_000 }))
+      await expect(tab.claim('ring:1')).resolves.toBe(true)
+      page.deployed = 'b'.repeat(40)
+      await page.comeBack()
+      expect(page.reloads).toBe(0)
+    } finally {
+      updates.stop()
+    }
   })
 })

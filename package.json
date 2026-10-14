@@ -65,6 +65,7 @@
     "prebuild:preview": "npm run build:core"
   },
   "dependencies": {
+    "@codefusion-cc/app-update": "^0.1.2",
     "@codefusion-cc/console": "^0.32.0",
     "@codefusion-cc/google-sign-in": "^0.1.2",
     "@codefusion-cc/realtime": "^0.1.3",

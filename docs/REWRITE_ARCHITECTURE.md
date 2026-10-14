@@ -1,10 +1,12 @@
 # Rewrite architecture
 
-Status: in progress. Supersedes the layering decisions in
-`DURABLE_OBJECTS_ARCHITECTURE.md` (which remains authoritative on *why*
-Durable Objects, the cost model, and the rollout phases).
+Status: closed (2026-10). The rewrite continued in the shared
+`@codefusion-cc/realtime` packages, which HeyHubs runs and Peerly is moving
+onto; `@peerly/core` is not developed further. Kept for the invariants below,
+which the move must not lose, and for the dependency rule
+`packages/core/src/protocol/boundaries.test.ts` enforces until the core goes.
 Date: 2026-07-25
-Applies to: `@peerly/core`, Peerly, HeyHubs
+Applies to: `@peerly/core`, Peerly
 
 ## What this rewrite is for
 
