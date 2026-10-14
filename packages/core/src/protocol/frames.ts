@@ -148,13 +148,6 @@ export function encodeFrame(type: string, options: EncodeOptions & { id: string 
   return JSON.stringify(frame)
 }
 
-export function encodeAck(forId: string, result?: unknown): string {
-  return encodeFrame('ack', {
-    id: forId,
-    payload: { for: forId, ...(result !== undefined ? { result } : {}) },
-  })
-}
-
 export function encodeError(
   code: ErrorCode,
   options: { forId?: string; retryable?: boolean; retryAfterMs?: number } = {}
@@ -168,20 +161,6 @@ export function encodeError(
       ...(options.retryAfterMs !== undefined ? { retryAfterMs: options.retryAfterMs } : {}),
     },
   })
-}
-
-export function encodeSnapshot(id: string, kind: string, state: unknown, seq: number): string {
-  return encodeFrame('snapshot', { id, payload: { kind, state, seq } })
-}
-
-export function encodeDelta(id: string, events: readonly unknown[], seq: number): string {
-  return encodeFrame('delta', { id, payload: { events, seq } })
-}
-
-/** Sent immediately before a server-initiated close, so the client can tell a
- *  deliberate shutdown from a dropped connection. */
-export function encodeBye(id: string, code: CloseCode): string {
-  return encodeFrame('bye', { id, payload: { code } })
 }
 
 export function decodeFrame(raw: string): Envelope | null {

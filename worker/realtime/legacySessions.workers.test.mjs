@@ -2,8 +2,10 @@ import { env } from 'cloudflare:workers'
 import { runInDurableObject } from 'cloudflare:test'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  deriveMemberId, deriveOpaqueUserId, deriveScopeRouteId, mintCapability, mintCookie, verifyCapability, verifyCookie,
+  bytesBase64Url, deriveMemberId, deriveOpaqueUserId, deriveScopeRouteId, deviceProofBytes, deviceProofHeaderNames,
+  gatewayName, mintCapability, mintCookie, PROOF_PURPOSES, verifyCapability, verifyCookie,
 } from '@codefusion-cc/realtime'
+import { openPageControlSocket } from '../testing/testAccounts.mjs'
 import worker from '../index.mjs'
 
 /**
@@ -91,7 +93,7 @@ describe('tokens minted before the move', () => {
 
 /** The account's gateway as the old code left it: the account, one session, the device's epoch. */
 async function seedLegacyGateway() {
-  const stub = env.USER_GATEWAYS.getByName(`peerly:${LEGACY.uid}`)
+  const stub = env.USER_GATEWAYS.getByName(gatewayName('peerly', LEGACY.uid))
   await runInDurableObject(stub, (_instance, state) => {
     const sql = state.storage.sql
     sql.exec('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'uid', LEGACY.uid)
@@ -102,36 +104,28 @@ async function seedLegacyGateway() {
   return stub
 }
 
-const base64Url = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes)))
-  .replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
-
-/** The headers the legacy device signs a session request with, as today's page does. */
+/** The headers the legacy device signs a request with, as today's page does. */
 async function legacyProof(purpose) {
   const key = await crypto.subtle.importKey('jwk', LEGACY.device, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
   const timestamp = Date.now()
   const nonce = crypto.randomUUID()
-  const payload = [purpose, 'peerly', LEGACY.deviceKeyId, String(timestamp), nonce, ''].join('\n')
-  const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(payload))
+  const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key,
+    deviceProofBytes(purpose, 'peerly', LEGACY.deviceKeyId, timestamp, nonce))
+  const names = deviceProofHeaderNames('peerly')
   return {
-    'x-peerly-device-key': LEGACY.deviceKeyId,
-    'x-peerly-request-ts': String(timestamp),
-    'x-peerly-request-nonce': nonce,
-    'x-peerly-request-signature': base64Url(signature),
+    [names.deviceKey]: LEGACY.deviceKeyId,
+    [names.timestamp]: String(timestamp),
+    [names.nonce]: nonce,
+    [names.signature]: bytesBase64Url(new Uint8Array(signature)),
   }
 }
 
-function waitFor(frames, match) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('no matching frame')), 5_000)
-    const poll = setInterval(() => {
-      const frame = frames.find(match)
-      if (!frame) return
-      clearInterval(poll)
-      clearTimeout(timer)
-      resolve(frame)
-    }, 5)
-  })
-}
+/** The session request today's page sends with the capability it holds. */
+const legacySession = async () => worker.fetch(new Request(`${ORIGIN}/api/network/session`, {
+  method: 'POST',
+  headers: { origin: ORIGIN, 'content-type': 'application/json', ...await legacyProof(PROOF_PURPOSES.session) },
+  body: JSON.stringify({ capability: LEGACY.capability }),
+}), deployment(), {})
 
 describe('a device signed in before the move', () => {
   it('opens a session with its capability, gets a fresh cookie and its ICE servers', async () => {
@@ -139,11 +133,7 @@ describe('a device signed in before the move', () => {
       throw new Error(`Unexpected outbound request: ${input instanceof Request ? input.url : input}`)
     })
     await seedLegacyGateway()
-    const response = await worker.fetch(new Request(`${ORIGIN}/api/network/session`, {
-      method: 'POST',
-      headers: { origin: ORIGIN, 'content-type': 'application/json', ...await legacyProof('realtime-session-v1') },
-      body: JSON.stringify({ capability: LEGACY.capability }),
-    }), deployment(), {})
+    const response = await legacySession()
 
     expect(response.status).toBe(200)
     const body = await response.json()
@@ -158,20 +148,9 @@ describe('a device signed in before the move', () => {
 
   it('opens its control socket with the cookie it holds and completes the hello', async () => {
     await seedLegacyGateway()
-    const response = await worker.fetch(new Request(`${ORIGIN}/api/realtime/control`, {
-      headers: { origin: ORIGIN, upgrade: 'websocket', cookie: `pnet=${LEGACY.cookie}` },
-    }), deployment(), {})
-
-    expect(response.status).toBe(101)
-    const ws = response.webSocket
-    const frames = []
-    ws.accept()
-    ws.addEventListener('message', event => frames.push(JSON.parse(String(event.data))))
-    // Exactly what today's page sends first (packages/core/src/app/realtimeClient.ts).
-    ws.send(JSON.stringify({ v: 1, id: 'legacy-hello', type: 'hello', sentAt: Date.now(), payload: { version: 1 } }))
-    const answer = await waitFor(frames, frame => frame.payload?.for === 'legacy-hello')
-    expect(answer.type).toBe('ack')
-    ws.close()
+    // The hello inside is exactly what today's page sends first (packages/core/src/app/realtimeClient.ts).
+    const control = await openPageControlSocket(request => worker.fetch(request, deployment(), {}), ORIGIN, `pnet=${LEGACY.cookie}`)
+    control.close()
   })
 
   it('is refused once its session is gone, so the test above is not passing by accident', async () => {
@@ -179,11 +158,7 @@ describe('a device signed in before the move', () => {
     await runInDurableObject(stub, (_instance, state) => {
       state.storage.sql.exec('DELETE FROM sessions WHERE sid = ?', LEGACY.sid)
     })
-    const response = await worker.fetch(new Request(`${ORIGIN}/api/network/session`, {
-      method: 'POST',
-      headers: { origin: ORIGIN, 'content-type': 'application/json', ...await legacyProof('realtime-session-v1') },
-      body: JSON.stringify({ capability: LEGACY.capability }),
-    }), deployment(), {})
+    const response = await legacySession()
     expect(response.status).toBe(401)
   })
 })

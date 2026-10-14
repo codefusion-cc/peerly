@@ -1,9 +1,10 @@
 import { env } from 'cloudflare:workers'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { deriveScopeRouteId } from '@codefusion-cc/realtime'
+import { deriveScopeRouteId, identityIssueProof } from '@codefusion-cc/realtime'
+import { deriveUserId } from '../../packages/core/dist/userId.js'
 import { clearOidcJwksCache } from '../../packages/core/worker/oidc.mjs'
 import { workspacePolicy } from './commands/content.test-fixtures.mjs'
-import { createTestAccounts } from '../testing/testAccounts.mjs'
+import { createTestAccounts, openPageControlSocket } from '../testing/testAccounts.mjs'
 import worker from '../index.mjs'
 
 /**
@@ -40,38 +41,12 @@ function fakeIdentityProvider() {
 
 afterEach(() => vi.restoreAllMocks())
 
-async function enroll(device, token, environment = deployment()) {
-  return call(new Request(`${ORIGIN}/api/network/enroll`, {
-    method: 'POST',
-    headers: { origin: ORIGIN, 'content-type': 'application/json', ...await device.proofHeaders('realtime-enroll-v1') },
-    body: JSON.stringify({ provider: 'oidc', token }),
-  }), environment)
-}
+const enroll = (device, token, environment = deployment()) =>
+  accounts.enroll(request => call(request, environment), device, token)
 
-/** A control socket as the page opens it, with a helper that sends one command and waits for its answer. */
-async function controlSocket(cookie, environment = deployment()) {
-  const response = await call(new Request(`${ORIGIN}/api/realtime/control`, {
-    headers: { origin: ORIGIN, upgrade: 'websocket', cookie },
-  }), environment)
-  expect(response.status).toBe(101)
-  const ws = response.webSocket
-  const frames = []
-  const closed = []
-  ws.accept()
-  ws.addEventListener('message', event => frames.push(JSON.parse(String(event.data))))
-  ws.addEventListener('close', event => closed.push(event.code))
-  const send = (type, payload) => {
-    const id = crypto.randomUUID()
-    ws.send(JSON.stringify({ v: 1, id, type, sentAt: Date.now(), payload }))
-    return vi.waitFor(() => {
-      const answer = frames.find(frame => frame.payload?.for === id)
-      if (!answer) throw new Error(`no answer to ${type}`)
-      return answer
-    }, { timeout: 5_000 })
-  }
-  expect((await send('hello', { version: 1 })).type).toBe('ack')
-  return { ws, send, closed }
-}
+/** A control socket as the page opens it. */
+const controlSocket = (cookie, environment = deployment()) =>
+  openPageControlSocket(request => call(request, environment), ORIGIN, cookie)
 
 describe('signing in', () => {
   it('gives two people their own capability, cookie and control socket', async () => {
@@ -147,9 +122,9 @@ describe('signal scopes for Trystero rooms', () => {
     fakeIdentityProvider()
     const alice = await signIn('alice-scope@e2e.test', 'sub-alice-scope')
     const bob = await signIn('bob-scope@e2e.test', 'sub-bob-scope')
-    const { send } = await controlSocket(alice.cookie)
+    const { command } = await controlSocket(alice.cookie)
     const before = Date.now()
-    const answer = await send('scope.request', { kind: 'room', capability: 'room-capability' })
+    const answer = await command('scope.request', { kind: 'room', capability: 'room-capability' })
     expect(answer.type).toBe('ack')
     // The same route the old gateway derived, so rooms keep their scope across the deploy.
     expect(answer.payload.result.routeId).toBe(await deriveScopeRouteId(env.OPAQUE_USER_ID_SECRET, 'peerly', 'room', 'room-capability'))
@@ -168,8 +143,8 @@ describe('signal scopes for Trystero rooms', () => {
   it('refuses a scope kind outside the four the page uses', async () => {
     fakeIdentityProvider()
     const alice = await signIn('alice-kind@e2e.test', 'sub-alice-kind')
-    const { send } = await controlSocket(alice.cookie)
-    const answer = await send('scope.request', { kind: 'evil', capability: 'x' })
+    const { command } = await controlSocket(alice.cookie)
+    const answer = await command('scope.request', { kind: 'evil', capability: 'x' })
     expect(answer.type).toBe('error')
   })
 })
@@ -180,9 +155,9 @@ describe('revoking a device from the devices page', () => {
     const laptop = await signIn('alice-devices@e2e.test', 'sub-alice-devices')
     const phone = await signIn('alice-devices@e2e.test', 'sub-alice-devices')
     const laptopSocket = await controlSocket(laptop.cookie)
-    const { send } = await controlSocket(phone.cookie)
+    const { command } = await controlSocket(phone.cookie)
 
-    const answer = await send('device.revoke', { deviceKeyId: laptop.device.deviceKeyId })
+    const answer = await command('device.revoke', { deviceKeyId: laptop.device.deviceKeyId })
     expect(answer).toMatchObject({ type: 'ack', payload: { result: { deviceKeyId: laptop.device.deviceKeyId } } })
     await vi.waitFor(() => expect(laptopSocket.closed).toEqual([4001]))
     expect((await call(await laptop.establish())).status).toBe(401)
@@ -198,8 +173,8 @@ describe('revoking a device from the devices page', () => {
   it('refuses a payload that names no device key', async () => {
     fakeIdentityProvider()
     const alice = await signIn('alice-revoke-bad@e2e.test', 'sub-alice-revoke-bad')
-    const { send } = await controlSocket(alice.cookie)
-    expect((await send('device.revoke', { deviceKeyId: 'not-a-key' })).type).toBe('error')
+    const { command } = await controlSocket(alice.cookie)
+    expect((await command('device.revoke', { deviceKeyId: 'not-a-key' })).type).toBe('error')
   })
 })
 
@@ -212,7 +187,7 @@ describe('encrypted content on preview', () => {
     const mallory = await signIn('mallory@e2e.test', 'sub-mallory-content', preview())
     const { payload } = await workspacePolicy()
 
-    const admitted = await (await controlSocket(alice.cookie, preview())).send('workspace.content.authorize', payload)
+    const admitted = await (await controlSocket(alice.cookie, preview())).command('workspace.content.authorize', payload)
     expect(admitted.type).toBe('ack')
     expect(admitted.payload.result.routeId).toMatch(/^[A-Za-z0-9_-]{43}$/)
     const channel = await call(new Request(`${ORIGIN}/api/realtime/content/${admitted.payload.result.routeId}`, {
@@ -222,22 +197,16 @@ describe('encrypted content on preview', () => {
     channel.webSocket.accept()
     channel.webSocket.close()
 
-    const refused = await (await controlSocket(mallory.cookie, preview())).send('workspace.content.authorize', payload)
+    const refused = await (await controlSocket(mallory.cookie, preview())).command('workspace.content.authorize', payload)
     expect(refused).toMatchObject({ type: 'error', payload: { code: 'auth-required' } })
   })
 })
 
 describe('identity certificates', () => {
-  /** The account's public id, as the page derives it from the provider's issuer and subject. */
-  async function publicUserId(issuer, subject) {
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${issuer}\n${subject}`))
-    return btoa(String.fromCharCode(...new Uint8Array(digest).slice(0, 16))).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
-  }
-
   async function issue(person) {
     return call(new Request(`${ORIGIN}/api/realtime/identity`, {
       method: 'POST',
-      headers: { origin: ORIGIN, cookie: person.cookie, ...await person.device.proofHeaders('peerly-identity-issue-v2') },
+      headers: { origin: ORIGIN, cookie: person.cookie, ...await person.device.proofHeaders(identityIssueProof('peerly')) },
     }))
   }
 
@@ -247,7 +216,7 @@ describe('identity certificates', () => {
     const issued = await issue(alice)
     expect(issued.status).toBe(200)
     const certificate = await issued.json()
-    expect(certificate).toMatchObject({ userId: await publicUserId('https://issuer.e2e.test', 'sub-alice-identity'), deviceKeyId: alice.device.deviceKeyId })
+    expect(certificate).toMatchObject({ userId: await deriveUserId('https://issuer.e2e.test', 'sub-alice-identity'), deviceKeyId: alice.device.deviceKeyId })
 
     const verified = await call(new Request(`${ORIGIN}/api/identity/verify`, { method: 'POST', body: certificate.certificate }))
     expect(verified.status).toBe(200)

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CLOSE, createIdSource, encodeAck, encodeError, FrameError, LIMITS, parseEnvelope,
+  CLOSE, createIdSource, encodeError, FrameError, LIMITS, parseEnvelope,
 } from './index.js'
-import { asDeviceKeyId, asMemberId, asOpaqueUserId } from './ids.js'
+import { asDeviceKeyId } from './ids.js'
 
 const frame = (overrides: Record<string, unknown> = {}) =>
   JSON.stringify({ v: 1, id: 'cmd-1', type: 'hello', sentAt: Date.now(), ...overrides })
@@ -79,25 +79,9 @@ describe('identifier parsers', () => {
     expect(asDeviceKeyId('P-256:short:short')).toBeNull()
     expect(asDeviceKeyId(42)).toBeNull()
   })
-
-  it('rejects an opaque user id that is too short to be an HMAC digest', () => {
-    expect(asOpaqueUserId('abc')).toBeNull()
-    expect(asOpaqueUserId('a'.repeat(43))).toBe('a'.repeat(43))
-  })
-
-  it('accepts any bounded app-space member id', () => {
-    expect(asMemberId('member-1')).toBe('member-1')
-    expect(asMemberId('')).toBeNull()
-  })
 })
 
 describe('response frames', () => {
-  it('echoes the command id on an ack so a client can settle its promise', () => {
-    const payload = JSON.parse(encodeAck('cmd-7', { routeId: 'r1' }))
-    expect(payload.payload.for).toBe('cmd-7')
-    expect(payload.payload.result).toEqual({ routeId: 'r1' })
-  })
-
   it('marks a retryable error with its retry hint', () => {
     const payload = JSON.parse(encodeError('rate-limited', { forId: 'c1', retryable: true, retryAfterMs: 1000 }))
     expect(payload.payload).toMatchObject({ for: 'c1', code: 'rate-limited', retryable: true, retryAfterMs: 1000 })

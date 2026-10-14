@@ -25,7 +25,6 @@ const memberIdOf = (sql, dk) =>
 const contentGateway = {
   schema: MEMBER_SCHEMA,
   channelBindings: ['CONTENT_CHANNELS'],
-  onDeviceSignedOut: (sql, dk) => sql.exec('DELETE FROM device_members WHERE dk = ?', dk),
   handlers: ({ sql, clock, appName, env }) => {
     const handlers = createContentHandlers({
       clock,

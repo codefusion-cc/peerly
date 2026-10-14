@@ -6,13 +6,11 @@
  */
 export { CLIENT_TIMINGS, LIMITS, type Limits } from './limits.js'
 export {
-  asDeviceKeyId, asMemberId, asOpaqueUserId, asRouteId,
-  createIdSource, isValidFrameId,
-  type DeviceKeyId, type IdSource, type MemberId, type OpaqueUserId, type RouteId,
+  asDeviceKeyId, createIdSource, isValidFrameId,
+  type DeviceKeyId, type IdSource,
 } from './ids.js'
 export {
-  boundedArray, boundedString, byteLength, CLOSE, decodeFrame, encodeAck, encodeBye,
-  encodeDelta, encodeError, encodeFrame, encodeSnapshot, ERROR_CODES, FrameError,
+  boundedString, byteLength, CLOSE, decodeFrame, encodeError, encodeFrame, FrameError,
   isPlainObject, parseEnvelope,
   type CloseCode, type Envelope, type ErrorCode,
 } from './frames.js'

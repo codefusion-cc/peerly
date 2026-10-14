@@ -412,7 +412,6 @@ export {
   type DeviceSignerLike,
   type ErrorCode,
   type OidcCredentialProvider,
-  type RealtimeFrame,
   type RoomEntry,
   type RoomPage,
   type ScopeHandle,

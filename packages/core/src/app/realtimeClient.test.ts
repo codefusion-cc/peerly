@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RealtimeClient } from './realtimeClient.js'
-import { CLIENT_TIMINGS, CLOSE, encodeAck, encodeDelta, encodeError } from '../protocol/index.js'
+// The gateway's own encoders: the client is tested against the frames the package Worker sends.
+import { encodeAck, encodeDelta } from '@codefusion-cc/realtime/protocol'
+import { CLIENT_TIMINGS, CLOSE, encodeError } from '../protocol/index.js'
 import type {
   ChannelEvents, ControlChannel, EnrollResult, KeyValueStore, SessionApi, SessionResult, Timers,
 } from '../ports/client.js'

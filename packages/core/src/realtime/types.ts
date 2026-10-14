@@ -1,19 +1,4 @@
-export type RealtimeFrame = {
-  v: 1
-  id: string
-  type: string
-  scope?: string
-  seq?: number
-  sentAt: number
-  payload?: unknown
-}
-
-export type ErrorCode =
-  | 'invalid-frame' | 'auth-required' | 'version-unsupported'
-  | 'rate-limited' | 'too-large' | 'cap-exceeded'
-  | 'not-found' | 'conflict' | 'service-unavailable' | 'internal'
-
-export type ScopeKind = 'workspace' | 'dm' | 'room' | 'chat'
+export type { ErrorCode, ScopeKind } from '../protocol/index.js'
 
 export type ScopeHandle = {
   routeId: string
