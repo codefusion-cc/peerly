@@ -11,6 +11,11 @@ import { join } from 'path'
  * easy to defeat by accident — a stray static `import './e2eKeys'`, or routing
  * the guard through a function the bundler cannot fold. This asserts the
  * outcome rather than trusting the mechanism.
+ *
+ * It also keeps out the hostnames of the retired VPS relay and coturn server:
+ * calls signal through the Worker's Durable Objects and relay through
+ * Cloudflare Realtime TURN, and a bundle naming the VPS would send them to a
+ * machine that is going away.
  */
 const DIST = process.argv[2] ?? 'dist'
 
@@ -21,6 +26,8 @@ const FORBIDDEN = [
   { label: 'E2E fake-Google public modulus (n)', needle: 'zrpA9xwzeaU2ZndxJNk7I3wH8scLSOW5UVgYqEl478G1MyGLsk0A6aQtZrJVky1uwbocZEDeYcRA48YM1W6wv8WOucjkd05yWse2uB' },
   { label: 'static relay credential sentinel', needle: 'STATIC_RELAY_SECRET_MUST_NOT_SHIP' },
   { label: 'static TURN credential sentinel', needle: 'STATIC_TURN_SECRET_MUST_NOT_SHIP' },
+  { label: 'retired VPS relay', needle: 'relay.peerly.cc' },
+  { label: 'retired VPS TURN', needle: 'turn.peerly.cc' },
 ]
 
 function walk(dir) {
@@ -50,13 +57,15 @@ for (const file of files) {
 }
 
 if (violations.length > 0) {
-  console.error('guard:bundle FAILED — forbidden credential material is in the production bundle:\n')
+  console.error('guard:bundle FAILED — the production bundle contains what must not ship:\n')
   for (const violation of violations) console.error(`  - ${violation}`)
   console.error(
     '\nThe E2E auth fixtures must stay behind the dead-code guard in src/collab/e2eAuth.ts.\n' +
-      'Check for a static import of ./e2eKeys, or a guard the bundler cannot fold to a constant.'
+      'Check for a static import of ./e2eKeys, or a guard the bundler cannot fold to a constant.\n' +
+      'A VPS hostname comes from a build variable or source that still names it; ICE servers come only\n' +
+      'from the control session (/api/network/session).'
   )
   process.exit(1)
 }
 
-console.log(`guard:bundle OK — no test key or static credential material in ${files.length} bundled files.`)
+console.log(`guard:bundle OK — no test key, static credential or VPS hostname in ${files.length} bundled files.`)

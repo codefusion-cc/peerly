@@ -37,8 +37,9 @@ hard way, and each must survive the rewrite with its explanation attached:
 - `iceCandidatePoolSize` must stay unset; Trystero already pools offers.
 - Five or more ICE servers slows gathering and trips a Firefox warning.
 - `ctx.id.name` is `undefined` inside a Durable Object, even via `getByName`.
-- TURN URLs are passed exactly as configured; rewriting ports assumes an
-  nginx SNI map that is per-hostname.
+- ICE servers come only from the control session, and the browser accepts
+  only Cloudflare's STUN and TURN URLs; anything else could steer a call's
+  media through some other relay.
 
 **Rule: no behavioural comment is deleted without either carrying it forward
 or writing a test that would fail if the behaviour regressed.**
@@ -115,13 +116,13 @@ So the harness is part of the foundation, not a follow-up:
   provider against a locally served JWKS. Test-only auth is *configuration*
   (`VITE_OIDC_*` unset in production ⇒ provider resolves to `null`), never a
   code branch that could ship enabled.
-- **TURN smoke** — `npm run turn:smoke -- turn:host:3478 turns:host:5349`.
-  Two browsers on one host connect over host candidates and never exercise
-  TURN; only this catches a bad TURN URL, a rotated secret, or a down VPS. It
-  asks coturn for a real allocation over each transport rather than driving
-  WebRTC, so it needs no browser, no signed-in session and no second user.
-  `probeTurnCapability` remains the in-app version, for telling *a user* about
-  *their* network.
+- **TURN health** — the Worker's five-minute cron and the public
+  `GET /api/media/health` ask Cloudflare for TURN credentials with the
+  deployed key; `npm run verify:production` calls the endpoint after every
+  production deploy. Two browsers on one host connect over host candidates and
+  never exercise TURN, so only this catches a revoked or missing key. It needs
+  no browser, no signed-in session and no second user. `probeTurnCapability`
+  remains the in-app version, for telling *a user* about *their* network.
 
 ## Migration order
 
@@ -149,34 +150,29 @@ Steps 1–5 are the shared foundation and are prerequisites for 6 and 7.
 
 ## What is left
 
-**Production still runs `COORDINATION_BACKEND: "legacy-relay"`.** Everything
-above exists only on preview. Ordered by risk carried, not by effort.
+Every build signals through the Durable Objects; production keeps content
+peer to peer, preview keeps it in Durable Objects. Ordered by risk carried, not
+by effort.
 
 ### A — close the verification gap, before anything ships
 
 | | Work | Why it is first |
 | --- | --- | --- |
 | A1 | ✅ HeyHubs browser harness (`npm run test:integration:do`) | This app's half of the control plane — the interest queue, the room directory, presence stats — had never run in a browser, and Peerly deploys most of it inert. Standing it up found the provider id hardcoded to `'google'` in four more places, which is invisible while there is one provider and stops a matched pair connecting the moment there are two. |
-| A2 | ✅ TURN smoke test (`npm run turn:smoke -- <urls>`) | Speaks TURN directly rather than through a browser, so it runs on a schedule with no page, no session and no second user. **Verified end to end against the live server** on 2026-07-28: real allocations over both 3478/udp and 5349/tls, with the certificate validated. It immediately earned itself — coturn's shared secret had been rotated without the workers being updated, which breaks TURN in both apps on *both* the legacy and Durable Objects paths, invisibly: users behind a strict NAT simply fail to connect. Nothing else in either repo can see that. |
+| A2 | ✅ TURN health check (`/api/media/health`, the five-minute cron, `npm run verify:production`) | Asks Cloudflare for credentials with the deployed key, with no page, no session and no second user. A missing or revoked key breaks calls between strict networks invisibly: users behind a strict NAT simply fail to connect, and no browser suite can see it. |
 | A3 | ✅ Pairing, sync and revocation in the harness | Two contexts on one account with different device keys: they pair, exchange grants, sync, and revoke. One assertion per sync rule — a value the other device lacks arrives, a preference it already chose is left alone, and a key no rule names does not travel. That last one is what closing the allow-list was for. |
 
 ### B — production cutover
 
-| | Work | Note |
-| --- | --- | --- |
-Written up step by step, with verification and rollback, in
-**`DURABLE_OBJECTS_CUTOVER.md`**. It is a runbook rather than a prepared
-commit for a concrete reason: when Workers Builds deployed non-production
-branches with `versions upload`, a branch carrying DO migrations failed to build
-from the moment it was pushed, because Cloudflare rejects versions containing a
-migration (10211). CI now deploys only `main`, with a full deploy, but B1 is
-still applied in its own PR and merged promptly, never staged ahead of time.
+Peerly's state; HeyHubs keeps its own. What remains is written up step by step,
+with verification and rollback, in **`DURABLE_OBJECTS_CUTOVER.md`**.
 
 | | Work | Note |
 | --- | --- | --- |
-| B1 | ☐ Bindings + `migrations` into `wrangler.jsonc` | Own PR per app, `COORDINATION_BACKEND` unchanged. Creates the namespaces and changes no behaviour, which is what makes it safe to land alone. |
-| B2 | ☐ Flip `COORDINATION_BACKEND` per app | Peerly first: it uses less of the control plane, so a fault there is cheaper to read. Legacy relay keeps serving until the flip holds. |
-| B3 | ☐ Delete the legacy relay path | Only after B2 holds. Removing it first leaves nothing to roll back to. |
+| B1 | ✅ Bindings + `migrations` in `wrangler.jsonc` | All four classes under `realtime-v1`. CI deploys only `main` with a full deploy; `versions upload` rejects a version containing a migration (10211), so migrations are never staged on a branch build. |
+| B2 | ✅ Signaling through Durable Objects for every build | `VITE_SIGNALING` defaults to `durable-objects`; `nostr` and `supabase` remain for development only. |
+| B3 | ✅ Self-hosted relay and TURN server removed | TURN is Cloudflare Realtime TURN, minted per session by the Worker. |
+| B4 | ☐ Content through Durable Objects in production | `CONTENT_BACKEND` and `VITE_CONTENT_BACKEND` change together; preview already runs it. |
 
 ### C — designed but unbuilt
 
@@ -297,14 +293,12 @@ It earned its keep immediately. The connection indicator polls a relay-socket
 map that this transport does not populate, so the app displayed "Signaling
 offline" for the entire life of a working session and held
 `useConnectionHealth` in a permanent error state. Every request succeeded. No
-existing test could see it: the workers suite has no UI, the unit suite has no
-transport, and the other browser suite runs on ws-relay.
+existing test could see it: the workers suite has no UI and the unit suite has
+no transport.
 
 **What it still will not prove.** Two Chromium contexts on one host connect
-over host candidates and never exercise TURN. A bad TURN URL, an expired
-credential or an unreachable coturn are invisible to it — which is why
-`wrangler.e2e.jsonc` deliberately configures no TURN at all rather than
-offering one the test cannot reach. That needs a separate scheduled check
-calling `probeTurnCapability` with `iceTransportPolicy: 'relay'` against the
-real server: cheap, no second user, and the only thing that catches the class
+over host candidates and never exercise TURN. A missing or revoked TURN key is
+invisible to it, which is why `wrangler.e2e.jsonc` deliberately configures no
+TURN key and the browsers get Cloudflare STUN alone. The scheduled media health
+check (A2) covers that instead: cheap, no second user, and it catches the class
 of failure that prompted this rewrite.

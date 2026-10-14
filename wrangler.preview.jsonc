@@ -7,13 +7,9 @@
   // (README.md, "Durable Objects control plane"):
   //   codefusion-console cloudflare workers:edit,domains:edit -- npm run deploy:preview
   //
-  // This is a separate config file (not an `env` inside wrangler.jsonc)
-  // because the Durable Object `migrations` block cannot appear anywhere in
-  // the default config: Workers Builds deployed non-production branches with
-  // `wrangler versions upload`, and Cloudflare rejects versions that carry a
-  // DO migration (API error 10211). Migrations move into wrangler.jsonc only
-  // in the production cutover PR, where merge-to-main applies them via a
-  // full deploy. See docs/DURABLE_OBJECTS_ARCHITECTURE.md Phase 5.
+  // A separate config file, not an `env` inside wrangler.jsonc, because its
+  // Durable Object migration history differs from production's (see the
+  // `migrations` block) and it keeps messages and files on the server.
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "peerly-preview",
   "main": "worker/index.mjs",
@@ -21,7 +17,7 @@
   // Vite replaces VITE_* values at build time; the runtime `vars` block below
   // does not populate the browser bundle.
   "build": {
-    "command": "VITE_APP_ID=peerly VITE_GOOGLE_CLIENT_ID=724645084534-eb9led5upjj8p46dr890tg3a0k3sonsk.apps.googleusercontent.com VITE_SIGNALING=durable-objects VITE_CONTENT_BACKEND=durable-objects VITE_TURN_URLS=turn:turn.peerly.cc:3478?transport=udp,turn:turn.peerly.cc:3478?transport=tcp,turns:turn.peerly.cc:5349?transport=tcp npm run build:preview"
+    "command": "VITE_APP_ID=peerly VITE_GOOGLE_CLIENT_ID=724645084534-eb9led5upjj8p46dr890tg3a0k3sonsk.apps.googleusercontent.com VITE_CONTENT_BACKEND=durable-objects npm run build:preview"
   },
   "routes": [
     { "pattern": "preview.peerly.cc", "custom_domain": true }
@@ -29,8 +25,6 @@
   "vars": {
     "APP_ID": "peerly",
     "VITE_GOOGLE_CLIENT_ID": "724645084534-eb9led5upjj8p46dr890tg3a0k3sonsk.apps.googleusercontent.com",
-    "TURN_URLS": "turn:turn.peerly.cc:3478?transport=udp,turn:turn.peerly.cc:3478?transport=tcp,turns:turn.peerly.cc:5349?transport=tcp",
-    "COORDINATION_BACKEND": "durable-objects",
     "CONTENT_BACKEND": "durable-objects"
   },
   "assets": {
@@ -40,6 +34,13 @@
     "run_worker_first": ["/api/*"]
   },
   "ratelimits": [
+    {
+      // Caps how often the public /api/media/health asks Cloudflare for TURN
+      // credentials, per location, beyond its one-minute shared answer.
+      "name": "MEDIA_RATE_LIMITER",
+      "namespace_id": "1008",
+      "simple": { "limit": 6, "period": 60 }
+    },
     {
       "name": "RENDEZVOUS_RATE_LIMITER",
       "namespace_id": "1002",
@@ -92,12 +93,14 @@
   ],
   "secrets": {
     "required": [
-      "TURN_AUTH_SECRET",
       "RENDEZVOUS_SECRET",
       "NETWORK_SESSION_SECRET",
-      "OPAQUE_USER_ID_SECRET"
+      "OPAQUE_USER_ID_SECRET",
+      "TURN_KEY_ID",
+      "TURN_KEY_API_TOKEN"
     ]
   },
+  "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   // CodeFusion Console (codefusion-cc/codefusion-console) reads every
   // invocation for its Failures, Health and Logs pages.

@@ -1,36 +1,31 @@
-# Production relay, TURN, and rendezvous rollout
+# Production rollout
 
-This describes the current production path (`COORDINATION_BACKEND=legacy-relay`).
-The Durable Objects control plane's own cutover/rollout steps live in
-[DURABLE_OBJECTS_ARCHITECTURE.md](./DURABLE_OBJECTS_ARCHITECTURE.md) (Phase 5)
-instead of here.
+Production is one Cloudflare Worker (`peerly`, [`wrangler.jsonc`](../wrangler.jsonc))
+serving the app, signaling through Durable Objects, and handing out Cloudflare
+STUN and TURN. Moving production content to Durable Objects is in
+[DURABLE_OBJECTS_CUTOVER.md](DURABLE_OBJECTS_CUTOVER.md).
 
-Deploy two independent relay/TURN stacks (different providers or regions) and
-set `VITE_RELAY_HOSTS` plus Worker `TURN_URLS` to both. Each relay gets its own
-hostname-bound entry in `RELAY_TICKET_SECRETS`; both Workers mint against the
-matching audience. The client rotates relay hosts after disconnect and browsers
-receive the complete TURN transport/region list.
+## Secrets
 
-Set Worker secrets interactively: `RELAY_TICKET_SECRET`,
-`RELAY_TICKET_AUDIENCES`, `TURN_AUTH_SECRET`, and `RENDEZVOUS_SECRET`. Never place
-their values in git or shell history. Configure `RENDEZVOUS_RATE_LIMITER` as in
-`wrangler.jsonc`. Match the coturn REST secret to `TURN_AUTH_SECRET`, with
-credentials expiring in at most ten minutes.
+`RENDEZVOUS_SECRET`, `NETWORK_SESSION_SECRET`, `OPAQUE_USER_ID_SECRET`,
+`TURN_KEY_ID` and `TURN_KEY_API_TOKEN` are required; wrangler refuses to deploy
+without them. The TURN key is provisioned and rotated through CodeFusion
+Console, never set by hand. Never place secret values in git, JSONC or shell
+history.
 
-Roll out in this order: secondary stack, Worker credentials, clients, primary
-stack. Validate `/healthz`, `/readyz`, `/metrics`, relay host/audience rejection,
-expired/replayed tickets, TURN allocation expiry and quotas, then remove every
-old static browser credential. Rotate relay/TURN secrets once more after the
-migration. Securely delete or expire nginx/coturn logs that captured old query
-tokens; current nginx logs `$uri`, never `$request_uri`.
+## Checks after a deploy
 
-Run `RELAY_LOAD_CLIENTS=50`, then 100 and 500 against staging. Repeat with
-reconnect churn, process restarts, one region unavailable, TURN disabled, slow
-consumers, directory fanout, and subscription churn. Record CPU, memory, event
-loop lag, drops, reconnect time, mobile dropped frames, and battery impact.
+CI runs `npm run verify:production` after every production deploy: the site
+must send HSTS, and `GET /api/media/health` must report that the Worker still
+gets TURN credentials from Cloudflare. The same check runs from the Worker's
+cron every five minutes and logs an error when it fails twice, three seconds
+apart; the console turns that line into a failure. Run it against preview with
+`PRODUCTION_SITE_URL=https://preview.peerly.cc npm run verify:production`.
 
-Finally commission an independent test of forged OIDC/device attestations,
-replay and cross-app/audience attacks, invitation interception, relay-ticket
-theft, topic authorization, reconnect/IP rate-limit bypass, TURN exhaustion,
-WebSocket parsing, and backpressure. This repository supplies test tooling and
-controls; it cannot substitute for independent production access and review.
+## Independent review
+
+Commission an independent test of forged OIDC/device attestations, replay and
+cross-app/audience attacks, invitation interception, topic authorization,
+reconnect and IP rate-limit bypass, TURN credential abuse, WebSocket parsing,
+and backpressure. This repository supplies test tooling and controls; it
+cannot substitute for independent production access and review.

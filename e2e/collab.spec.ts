@@ -16,7 +16,7 @@ import {
   expectSharedFilesUsable,
   waitForWorkspace,
   collectConsole,
-  waitForRelay,
+  waitForSignaling,
   openProfile,
   rejoinWorkspace,
   withTwoGlobalUsers,
@@ -37,7 +37,7 @@ async function joinAlice(browser: Browser) {
     email: 'alice@e2e.test',
     color: '#e01e5a',
   })
-  await waitForRelay(page)
+  await waitForSignaling(page)
   return { context, page }
 }
 
@@ -348,7 +348,7 @@ test.describe('Peerly P2P collaboration', () => {
     // it: the ok→expired transition is identical wherever exp sits.
     test.setTimeout(60_000)
     await joinWorkspace(page, { name: 'Alice', email: 'alice@e2e.test' })
-    await waitForRelay(page)
+    await waitForSignaling(page)
 
     await page.evaluate(() => {
       const token = localStorage.getItem('peerly-id-token')
@@ -496,7 +496,7 @@ test.describe('Peerly P2P collaboration', () => {
 
   test('signaling is online after join', async ({ page }) => {
     await joinWorkspace(page, { name: 'Alice', email: 'alice@e2e.test' })
-    await waitForRelay(page)
+    await waitForSignaling(page)
     await expect(page.getByTestId('connection-status')).not.toContainText('Signaling offline')
     await expect(page.locator('.workspace-name')).toContainText('test-ws')
   })
@@ -556,7 +556,7 @@ test.describe('Peerly P2P collaboration', () => {
     collectConsole(bob, logs)
 
     await joinWorkspace(alice, { name: 'Alice', email: 'alice@e2e.test', color: '#e01e5a' })
-    await waitForRelay(alice)
+    await waitForSignaling(alice)
     await joinWorkspace(bob, { name: 'Bob', email: 'bob@e2e.test', color: '#2eb67d' })
 
     await waitForPeerConnection(alice)
@@ -579,7 +579,7 @@ test.describe('Peerly P2P collaboration', () => {
     const bob = await bobCtx.newPage()
 
     await joinWorkspace(alice, { name: 'Alice', email: 'alice@e2e.test', color: '#e01e5a' })
-    await waitForRelay(alice)
+    await waitForSignaling(alice)
     await joinWorkspace(bob, { name: 'Bob', email: 'bob@e2e.test', color: '#2eb67d' })
 
     await waitForPeerConnection(alice)
@@ -606,7 +606,7 @@ test.describe('Peerly P2P collaboration', () => {
     const bob = await bobCtx.newPage()
 
     await joinWorkspace(alice, { name: 'Alice', email: 'alice@e2e.test' })
-    await waitForRelay(alice)
+    await waitForSignaling(alice)
     await joinWorkspace(bob, { name: 'Bob', email: 'bob@e2e.test' })
 
     await waitForPeerConnection(alice)
@@ -715,7 +715,7 @@ test.describe('Peerly P2P collaboration', () => {
     const bob = await bobCtx.newPage()
 
     await joinWorkspace(alice, { name: 'Alice', email: 'alice@e2e.test' })
-    await waitForRelay(alice)
+    await waitForSignaling(alice)
     await joinWorkspace(bob, { name: 'Bob', email: 'bob@e2e.test' })
 
     await waitForPeerConnection(alice)
@@ -817,7 +817,7 @@ test.describe('Peerly P2P collaboration', () => {
     const bob = await bobCtx.newPage()
 
     await joinWorkspace(alice, { name: 'Alice', email: 'alice@e2e.test' })
-    await waitForRelay(alice)
+    await waitForSignaling(alice)
     await joinWorkspace(bob, { name: 'Bob', email: 'bob@e2e.test' })
 
     await waitForPeerConnection(alice)
@@ -851,7 +851,7 @@ test.describe('Peerly P2P collaboration', () => {
     const bob = await bobCtx.newPage()
 
     await joinWorkspace(alice, { name: 'Alice', email: 'alice@e2e.test' })
-    await waitForRelay(alice)
+    await waitForSignaling(alice)
     await joinWorkspace(bob, { name: 'Bob', email: 'bob@e2e.test' })
     await waitForPeerConnection(alice)
     await waitForPeerConnection(bob)
@@ -879,7 +879,7 @@ test.describe('Peerly P2P collaboration', () => {
 
   test('camera re-enable restores the local preview', async ({ page }) => {
     await joinWorkspace(page, { name: 'Alice', email: 'alice@e2e.test' })
-    await waitForRelay(page)
+    await waitForSignaling(page)
 
     await page.getByTestId('video-call-button').click()
     await expect(page.locator('.video-call-overlay')).toBeVisible()
@@ -904,7 +904,7 @@ test.describe('Peerly P2P collaboration', () => {
 
   test('shared image preview survives page reload', async ({ page }) => {
     await joinWorkspace(page, { name: 'Alice', email: 'alice@e2e.test' })
-    await waitForRelay(page)
+    await waitForSignaling(page)
 
     const png = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -937,7 +937,7 @@ test.describe('Peerly P2P collaboration', () => {
 
   test('shared file download link still works after reload', async ({ page }) => {
     await joinWorkspace(page, { name: 'Alice', email: 'alice@e2e.test' })
-    await waitForRelay(page)
+    await waitForSignaling(page)
 
     await page.getByTestId('file-input').setInputFiles({
       name: 'notes.txt',
@@ -966,7 +966,7 @@ test.describe('Peerly P2P collaboration', () => {
 
   test('session persists after page reload', async ({ page }) => {
     await joinWorkspace(page, { name: 'Alice', email: 'alice@e2e.test', color: '#e01e5a' })
-    await waitForRelay(page)
+    await waitForSignaling(page)
     await page.reload()
     await expect(page.locator('.sidebar')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByTestId('member-list')).toContainText('Alice')
@@ -981,7 +981,7 @@ test.describe('Peerly P2P collaboration', () => {
     const bob = await bobCtx.newPage()
 
     await joinWorkspace(alice, { name: 'Alice', email: 'alice@e2e.test' })
-    await waitForRelay(alice)
+    await waitForSignaling(alice)
     await joinWorkspace(bob, { name: 'Bob', email: 'bob@e2e.test' })
 
     await waitForPeerConnection(alice)
@@ -1005,7 +1005,7 @@ test.describe('Peerly P2P collaboration', () => {
     const bob = await bobCtx.newPage()
 
     await joinWorkspace(alice, { name: 'Alice', email: 'alice@e2e.test' })
-    await waitForRelay(alice)
+    await waitForSignaling(alice)
     await joinWorkspace(bob, { name: 'Bob', email: 'bob@e2e.test' })
 
     await waitForPeerConnection(alice)
@@ -1091,7 +1091,7 @@ test.describe('Peerly P2P collaboration', () => {
 
     try {
       await joinWorkspace(here, { name: 'Alice', email: 'alice@e2e.test' })
-      await waitForRelay(here)
+      await waitForSignaling(here)
       await joinWorkspace(laptop, { name: 'Alice', email: 'alice@e2e.test' })
       await waitForPeerConnection(here)
       await waitForPeerConnection(laptop)
@@ -1375,8 +1375,9 @@ test.describe('Peerly P2P collaboration', () => {
     await page.getByTestId('workspace-settings-open').click()
     await expect(page.getByTestId('workspace-storage')).toBeVisible()
     await expect(page.getByTestId('notification-settings')).toBeVisible()
-    // Relay health is Nostr-only diagnostics; E2E runs ws-relay, so the card
-    // must stay hidden rather than probe a strategy it doesn't apply to.
+    // Relay health is Nostr-only diagnostics; E2E signals through the Durable
+    // Objects, so the card must stay hidden rather than probe a strategy it
+    // doesn't apply to.
     await expect(page.getByTestId('relay-health-card')).toHaveCount(0)
     await page.getByTestId('rail-home').click()
     await page.getByTestId('home-account-tab').click()

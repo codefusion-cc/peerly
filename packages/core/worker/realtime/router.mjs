@@ -17,10 +17,6 @@ function stripTrustedHeaders(request) {
   return new Request(request.url, { method: request.method, headers, body: request.body, duplex: request.body ? 'half' : undefined })
 }
 
-function serviceUnavailable() {
-  return Response.json({ code: 'service-unavailable' }, { status: 503, headers: { 'retry-after': '60' } })
-}
-
 /**
  * Authenticates an app-owned realtime WebSocket route and returns a request
  * carrying server-stamped identity headers. Inbound spoofed headers are
@@ -39,19 +35,19 @@ export async function prepareAuthenticatedRealtimeUpgrade(request, env, config) 
 }
 
 /**
- * Owns every `/api/network/*` and `/api/realtime/*` route. Returns `null`
- * for paths outside that set so each app's existing worker entry chain
- * (Google auth bridge, legacy network credentials, static assets) is
- * untouched — this call is inserted before that fallthrough.
+ * Owns the control plane's `/api/network/*` and `/api/realtime/*` routes.
+ * Returns `null` for paths outside that set so each app's own routes (Google
+ * auth bridge, static assets) follow.
  *
- * `config`: `{ app, allowedOrigin(origin): boolean }`.
+ * `config`: `{ app, allowedOrigin(origin): boolean, requirePublicUserId?,
+ * requirePrivateMemberId?, iceServers?(env) }`. `iceServers` answers the ICE
+ * servers a session hands its browser, as `{ servers, ttlMs }`;
+ * without it the browser keeps its WebRTC library's defaults.
  */
 export async function handleRealtimeRoute(request, env, config) {
   const url = new URL(request.url)
   const isSignal = url.pathname.startsWith(SIGNAL_PREFIX)
   if (!REALTIME_PATHS.has(url.pathname) && !isSignal) return null
-
-  if (env.COORDINATION_BACKEND !== 'durable-objects') return serviceUnavailable()
 
   if (url.pathname === ENROLL_PATH) return handleEnroll(request, env, config)
   if (url.pathname === SESSION_PATH) return handleSession(request, env, config)

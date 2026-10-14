@@ -3,8 +3,8 @@ import type { joinRoom as joinNostrRoom } from '@trystero-p2p/nostr'
 import type { Env } from './env.js'
 import { requireAppId } from './env.js'
 import type { SignalingStrategy } from './signaling.js'
-import { getNostrRelayConfig, getSupabaseRoomConfig, resolveIceServers } from './relays.js'
-import { getDurableObjectsIceServers } from './realtime/runtime.js'
+import { getNostrRelayConfig, getSupabaseRoomConfig } from './relays.js'
+import { awaitDurableObjectsIce, currentIceServers } from './realtime/runtime.js'
 
 export type Room = ReturnType<typeof joinNostrRoom>
 
@@ -96,10 +96,8 @@ export type JoinRoomOptions = {
    * "unprotected": fall back to the appId/roomId-derived key.
    */
   password?: string
-  /** Build-time environment (`import.meta.env`) for relay/TURN/Supabase config. */
+  /** Build-time environment (`import.meta.env`) for the app id and dev signaling config. */
   env?: Env
-  /** ws-relay only: resolved relay URLs (see resolveRelayUrls). */
-  relayUrls?: string[]
   onPeerHandshake?: PeerHandshake
   onJoinError?: (details: { error?: unknown }) => void
   /** Override Trystero data-channel handshake wait (ms). */
@@ -113,7 +111,7 @@ export type JoinRoomOptions = {
 /**
  * Join a Trystero room on the chosen signaling strategy. Strategy modules are
  * imported dynamically so an app only bundles the transport it actually uses;
- * @trystero-p2p/supabase and @trystero-p2p/ws-relay are optional peer deps.
+ * @trystero-p2p/supabase is an optional peer dep.
  */
 export async function joinRoomByCode(options: JoinRoomOptions): Promise<Room> {
   const {
@@ -121,7 +119,6 @@ export async function joinRoomByCode(options: JoinRoomOptions): Promise<Room> {
     appId,
     roomId,
     password,
-    relayUrls,
     onPeerHandshake,
     onJoinError,
     handshakeTimeoutMs = DEFAULT_HANDSHAKE_TIMEOUT_MS,
@@ -131,28 +128,33 @@ export async function joinRoomByCode(options: JoinRoomOptions): Promise<Room> {
   const env = options.env ?? {}
 
   const durableApp = strategy === 'durable-objects' ? requireAppId(env) : ''
-  const iceServers = strategy === 'durable-objects'
-    ? await getDurableObjectsIceServers(durableApp)
-    : await resolveIceServers(env)
+  if (durableApp) await awaitDurableObjectsIce(durableApp)
+  const rtcConfig: RTCConfiguration = {
+    // Do not set iceCandidatePoolSize here. Trystero already keeps a pool of
+    // prepared offers; asking every one of those PeerConnections to pre-gather
+    // four additional candidate sets multiplies TURN allocations into the
+    // hundreds before a user has connected to anybody.
+    // Keep the browser's default bundle policy. Forcing max-bundle makes
+    // Chromium reject Trystero's regenerated data-only offers because those
+    // offers legitimately have no BUNDLE group (breaking leave/rematch).
+    rtcpMuxPolicy: 'require',
+  }
+  if (durableApp) {
+    // Cloudflare's STUN and TURN from the control session, replacing
+    // Trystero's default STUN list. A getter, because Trystero spreads
+    // rtcConfig into every RTCPeerConnection it makes: a room that stays open
+    // past the TURN credentials' lifetime then hands new peers the renewed
+    // ones instead of the ones it joined with. This is deliberately the only
+    // place ICE servers are supplied; passing them through turnConfig as well
+    // doubles the ICE work.
+    Object.defineProperty(rtcConfig, 'iceServers', {
+      enumerable: true,
+      get: () => currentIceServers(durableApp),
+    })
+  }
   const baseConfig = {
     ...(password ? { password } : {}),
-    rtcConfig: {
-      // Do not set iceCandidatePoolSize here. Trystero already keeps a pool of
-      // prepared offers; asking every one of those PeerConnections to pre-gather
-      // four additional candidate sets multiplies TURN allocations into the
-      // hundreds before a user has connected to anybody.
-      // Keep the browser's default bundle policy. Forcing max-bundle makes
-      // Chromium reject Trystero's regenerated data-only offers because those
-      // offers legitimately have no BUNDLE group (breaking leave/rematch).
-      rtcpMuxPolicy: 'require' as RTCRtcpMuxPolicy,
-      // A lean STUN + TURN list, deliberately replacing Trystero's four default
-      // STUN servers: five-plus ICE servers slow discovery (and Firefox warns).
-      // Left unset when no TURN is configured so Trystero keeps its defaults.
-      // This is deliberately the only place TURN is supplied. Passing the same
-      // servers through turnConfig as well causes duplicate ICE work; Trystero
-      // also checks rtcConfig.iceServers when producing TURN diagnostics.
-      ...(iceServers ? { iceServers } : {}),
-    },
+    rtcConfig,
   }
 
   const callbacks = {
@@ -173,22 +175,6 @@ export async function joinRoomByCode(options: JoinRoomOptions): Promise<Room> {
           capability: password || roomId,
           ...(scopeRouteId ? { routeId: scopeRouteId } : {}),
         },
-      },
-      roomId,
-      callbacks
-    )
-  }
-
-  if (strategy === 'ws-relay') {
-    if (!relayUrls || relayUrls.length === 0) {
-      throw new Error('ws-relay strategy requires relayUrls (see resolveRelayUrls)')
-    }
-    const { joinRoom } = await import('@trystero-p2p/ws-relay')
-    return joinRoom(
-      {
-        ...baseConfig,
-        appId,
-        relayConfig: { urls: relayUrls },
       },
       roomId,
       callbacks

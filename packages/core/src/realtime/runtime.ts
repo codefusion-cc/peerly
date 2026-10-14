@@ -1,25 +1,26 @@
 import { getRuntimeAuthCredential } from '../runtimeCredentials.js'
 import { RealtimeClient } from '../app/realtimeClient.js'
 import { selectDurableObjectsTransport, type CoordinationTransport } from './transport.js'
-import { FALLBACK_STUN_URL, type TurnServer } from '../relays.js'
+import { hasRelay, type IceServer } from '@codefusion-cc/realtime-media/ice'
+import { parseIceGrant, usableIceServers, type IceGrant } from './ice.js'
 import { requireAppId, type Env } from '../env.js'
 import { resolveSignalingStrategy } from '../signaling.js'
 
 const transports = new Map<string, CoordinationTransport>()
-const turnServers = new Map<string, TurnServer[]>()
-/** Resolves on the first `turn` event per app, so a join that starts while the
+const iceGrants = new Map<string, IceGrant>()
+/** Resolves on the first ICE grant per app, so a join that starts while the
  *  control session is still being established still gets TURN instead of
- *  silently falling back to Trystero's STUN-only defaults. */
-const turnArrivals = new Map<string, { promise: Promise<void>; resolve: () => void }>()
-const TURN_WAIT_MS = 10_000
+ *  starting on STUN alone. */
+const iceArrivals = new Map<string, { promise: Promise<void>; resolve: () => void }>()
+const ICE_WAIT_MS = 10_000
 
-function turnArrival(app: string) {
-  const existing = turnArrivals.get(app)
+function iceArrival(app: string) {
+  const existing = iceArrivals.get(app)
   if (existing) return existing
   let resolve = (): void => {}
   const promise = new Promise<void>(settle => { resolve = settle })
   const entry = { promise, resolve }
-  turnArrivals.set(app, entry)
+  iceArrivals.set(app, entry)
   return entry
 }
 
@@ -35,39 +36,26 @@ export function getDurableObjectsTransport(app: string): CoordinationTransport {
     credentialProvider: getRuntimeAuthCredential,
   })
   if (!transport) throw new Error('Durable Objects transport is unavailable')
-  transport.events.addEventListener('turn', event => {
-    const value = (event as CustomEvent<{
-      urls?: unknown
-      username?: unknown
-      credential?: unknown
-    }>).detail
-    if (!value || (!Array.isArray(value.urls) && typeof value.urls !== 'string')) return
-    const urls = Array.isArray(value.urls)
-      ? value.urls.filter((url): url is string => typeof url === 'string')
-      : [value.urls]
-    if (urls.length === 0) return
-    // Mirror the legacy /api/network/credentials shape exactly: one public
-    // STUN entry alongside our own TURN, and the TURN URLs *exactly as the
-    // deployment configured them*.
-    //
-    // Do not expand them into a transport ladder here. `expandTurnUrls`
-    // rewrites `turns:<host>:5349` to `turns:<host>:443`, which only works
-    // where nginx SNI-routes 443 to coturn — that is configured for
-    // turn.peerly.cc and not for every TURN hostname (see
-    // docs/turn-relay-vps.md). Expanding therefore *replaced* a working TLS
-    // endpoint with one that may terminate somewhere else entirely. The
-    // legacy path this backend has to match sends TURN_URLS unexpanded; when
-    // chasing a connection regression, differing from the known-good path is
-    // the last thing you want to do.
-    turnServers.set(app, [
-      { urls: [FALLBACK_STUN_URL] },
-      {
-        urls,
-        ...(typeof value.username === 'string' ? { username: value.username } : {}),
-        ...(typeof value.credential === 'string' ? { credential: value.credential } : {}),
-      },
-    ])
-    turnArrival(app).resolve()
+  transport.events.addEventListener('ice', event => {
+    // A session that was still being established when its socket closed (a
+    // sign-out, an account switch) must not hand its servers to the next one.
+    if (transports.get(app) !== transport) return
+    // The session has answered, usable or not: a join waiting for it gains
+    // nothing by waiting out ICE_WAIT_MS.
+    iceArrival(app).resolve()
+    const grant = parseIceGrant((event as CustomEvent<unknown>).detail, Date.now())
+    if (!grant) {
+      // Keep the last good grant: it is still the best this tab has, and it
+      // degrades to STUN by itself when it expires.
+      console.warn('[peerly] the session sent no usable ICE servers')
+      return
+    }
+    // A refresh without TURN is Cloudflare's API failing for a moment or a
+    // key being removed. TURN credentials already held stay valid until they
+    // expire, and are still better than STUN alone until then.
+    const held = iceGrants.get(app)
+    if (!hasRelay(grant.servers) && held && hasRelay(usableIceServers(held, Date.now()))) return
+    iceGrants.set(app, grant)
   })
   transports.set(app, transport)
   return transport
@@ -94,20 +82,46 @@ export async function sendRealtimeCommand<T = unknown>(
   return transport.sendCommand<T>(type, payload)
 }
 
-export async function getDurableObjectsIceServers(app: string): Promise<TurnServer[] | undefined> {
+/**
+ * The ICE servers for a peer connection made now. Read it at each connection,
+ * not once per room: the session refresh replaces the TURN credentials while
+ * a room stays open.
+ */
+export function currentIceServers(app: string, now = Date.now()): IceServer[] {
+  return usableIceServers(iceGrants.get(app), now)
+}
+
+/** Whether a peer connection made now could relay through TURN. */
+export function durableObjectsTurnAvailable(app: string, now = Date.now()): boolean {
+  return hasRelay(currentIceServers(app, now))
+}
+
+/**
+ * The ICE servers once the control session has answered, or undefined when
+ * it has not within a bounded wait.
+ */
+export async function getDurableObjectsIceServers(app: string): Promise<IceServer[] | undefined> {
+  await awaitDurableObjectsIce(app)
+  return iceGrants.has(app) ? currentIceServers(app) : undefined
+}
+
+/**
+ * Waits for the control session's first ICE grant, a bounded moment at most,
+ * so the first peer connections of a fresh tab can use TURN.
+ */
+export async function awaitDurableObjectsIce(app: string): Promise<void> {
   const transport = getDurableObjectsTransport(app)
-  const arrival = turnArrival(app)
-  await transport.connect()
+  const arrival = iceArrival(app)
   // `connect()` resolves even when the cycle failed and only scheduled a
-  // retry, so the credentials may legitimately not have landed yet. Wait a
-  // bounded moment for them rather than reporting "no TURN configured".
-  if (!turnServers.has(app)) {
-    await Promise.race([
-      arrival.promise,
-      new Promise<void>(resolve => setTimeout(resolve, TURN_WAIT_MS)),
-    ])
-  }
-  return turnServers.get(app)
+  // retry, so the grant may not have landed yet; once one has, `arrival` is
+  // settled and the race below returns at once.
+  await transport.connect()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  await Promise.race([
+    arrival.promise,
+    new Promise<void>(resolve => { timer = setTimeout(resolve, ICE_WAIT_MS) }),
+  ])
+  clearTimeout(timer)
 }
 
 /**
@@ -115,10 +129,11 @@ export async function getDurableObjectsIceServers(app: string): Promise<TurnServ
  * sessions are deleted, its device epoch is bumped so any capability it still
  * holds stops validating, and its control sockets are closed.
  *
- * A no-op on the legacy backend, which has no server-side device registry —
- * so callers can wire this to "revoke" unconditionally. Rejects if the control
- * plane could not be reached, because a revocation that silently did nothing
- * is worse than one that reports failure.
+ * A no-op on the development-only nostr and Supabase signaling, which have no
+ * server-side device registry, so callers can wire this to "revoke"
+ * unconditionally. Rejects if the control plane could not be reached, because
+ * a revocation that silently did nothing is worse than one that reports
+ * failure.
  */
 export async function revokeRealtimeDevice(env: Env, deviceKeyId: string): Promise<void> {
   if (resolveSignalingStrategy(env) !== 'durable-objects') return
@@ -129,14 +144,14 @@ export function closeDurableObjectsTransport(app?: string): void {
   if (app) {
     transports.get(app)?.close()
     transports.delete(app)
-    turnServers.delete(app)
-    turnArrivals.delete(app)
+    iceGrants.delete(app)
+    iceArrivals.delete(app)
     return
   }
   for (const transport of transports.values()) transport.close()
   transports.clear()
-  turnServers.clear()
-  turnArrivals.clear()
+  iceGrants.clear()
+  iceArrivals.clear()
 }
 
 export { RealtimeClient }

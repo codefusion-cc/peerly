@@ -17,9 +17,10 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    // Inlined so the `cloudflare:workers` alias above reaches the package's
-    // own import of it (worker/console/consoleAdmin.mjs).
-    server: { deps: { inline: ['@codefusion-cc/console'] } },
+    // Bundled rather than loaded by Node, so the cloudflare:workers alias above
+    // reaches the media package's Durable Object and the console it reports to
+    // (worker/console/consoleAdmin.mjs).
+    server: { deps: { inline: ['@codefusion-cc/realtime-media', '@codefusion-cc/realtime', '@codefusion-cc/console'] } },
     include: ['src/**/*.test.{ts,tsx}', 'packages/core/src/**/*.test.ts', 'worker/**/*.test.mjs'],
     // npm run test:workers runs these in workerd.
     exclude: [...configDefaults.exclude, '**/*.workers.test.*'],

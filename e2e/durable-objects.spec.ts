@@ -27,8 +27,8 @@ import {
  * would notice.
  *
  * What this cannot prove: two Chromium contexts on one host connect over host
- * candidates and never touch TURN. See docs/REWRITE_ARCHITECTURE.md — that
- * needs a separate probe against the real relay.
+ * candidates and never touch TURN. Cloudflare TURN is checked from outside
+ * instead, by `npm run verify:production` and the media health cron.
  */
 
 const WORKSPACE = 'do-e2e'

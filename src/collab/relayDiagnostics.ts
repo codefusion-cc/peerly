@@ -38,7 +38,7 @@ export function subscribeRelayDiagnostics(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
-/** Probing is meaningful only for Nostr — ws-relay/Supabase are one host you run. */
+/** Probing is meaningful only for Nostr: Durable Objects and Supabase are one host, not a list of relays. */
 export function relayDiagnosticsApplicable(): boolean {
   return getSignalingStrategy() === 'nostr'
 }

@@ -2,7 +2,7 @@ import {
   resolveOidcProvider,
   verifyDevicePayload,
   verifyOidcToken,
-} from './networkCredentials.mjs'
+} from './oidc.mjs'
 
 const SCHEME = 'peerly-rendezvous-lookup-v1'
 const MAX_EMAIL_LENGTH = 320

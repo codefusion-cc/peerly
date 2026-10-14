@@ -2,7 +2,6 @@ const GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs'
 const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com']
 const MAX_TOKEN_BYTES = 16_000
 const MAX_REQUEST_AGE_MS = 60_000
-const REQUEST_SCHEME = 'peerly-network-credentials-v1'
 const JWKS_FRESH_MS = 5 * 60_000
 const JWKS_STALE_MS = 24 * 60 * 60_000
 const jwksCache = new Map()
@@ -12,20 +11,6 @@ const base64UrlBytes = value => {
   const binary = atob(normalized + '='.repeat((4 - normalized.length % 4) % 4))
   return Uint8Array.from(binary, char => char.charCodeAt(0))
 }
-const bytesBase64 = bytes => {
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary)
-}
-const bytesBase64Url = bytes => bytesBase64(bytes).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
-const textBase64Url = value => bytesBase64Url(new TextEncoder().encode(value))
-const requestProofBytes = (providerId, deviceKeyId, timestamp, nonce) => new TextEncoder().encode([
-  REQUEST_SCHEME,
-  providerId,
-  deviceKeyId,
-  String(timestamp),
-  nonce,
-].join('\n'))
 
 const nonEmpty = value => typeof value === 'string' && value.trim() ? value.trim() : undefined
 
@@ -152,38 +137,6 @@ export async function verifyOidcToken(token, provider, fetcher = fetch, now = Da
   return claims
 }
 
-export async function verifyDeviceRequest(headers, providerId, claims, now = Date.now()) {
-  const deviceKeyId = headers.get('x-peerly-device-key') ?? ''
-  const timestampRaw = headers.get('x-peerly-request-ts') ?? ''
-  const nonce = headers.get('x-peerly-request-nonce') ?? ''
-  const signature = headers.get('x-peerly-request-signature') ?? ''
-  const timestamp = Number(timestampRaw)
-  if (!/^P-256:[A-Za-z0-9_-]{20,}:[A-Za-z0-9_-]{20,}$/.test(deviceKeyId)) return null
-  if (!Number.isSafeInteger(timestamp) || Math.abs(now - timestamp) > MAX_REQUEST_AGE_MS) return null
-  if (nonce.length < 16 || nonce.length > 128 || signature.length < 40 || signature.length > 256) return null
-  if (claims.nonce !== deviceKeyId) return null
-  const [curve, x, y] = deviceKeyId.split(':')
-  if (curve !== 'P-256' || !x || !y) return null
-  try {
-    const key = await crypto.subtle.importKey(
-      'jwk',
-      { kty: 'EC', crv: 'P-256', x, y, ext: true, key_ops: ['verify'] },
-      { name: 'ECDSA', namedCurve: 'P-256' },
-      false,
-      ['verify']
-    )
-    const valid = await crypto.subtle.verify(
-      { name: 'ECDSA', hash: 'SHA-256' },
-      key,
-      base64UrlBytes(signature),
-      requestProofBytes(providerId, deviceKeyId, timestamp, nonce)
-    )
-    return valid ? { deviceKeyId, timestamp, nonce } : null
-  } catch {
-    return null
-  }
-}
-
 /** Verify a device-bound signature over an endpoint-specific canonical payload. */
 export async function verifyDevicePayload(headers, claims, payload, now = Date.now()) {
   const deviceKeyId = headers.get('x-peerly-device-key') ?? ''
@@ -213,81 +166,5 @@ export async function verifyDevicePayload(headers, claims, payload, now = Date.n
     return valid ? { deviceKeyId, timestamp, nonce } : null
   } catch {
     return null
-  }
-}
-
-async function hmac(secret, algorithm, value) {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: algorithm },
-    false,
-    ['sign']
-  )
-  return new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)))
-}
-
-/** Issue short-lived, OIDC- and live-device-bound relay and coturn REST credentials. */
-export async function issueNetworkCredentials(request, env) {
-  if (request.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405, headers: { allow: 'POST' } })
-  }
-  const authorization = request.headers.get('authorization') ?? ''
-  const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
-  const providerId = request.headers.get('x-peerly-provider') ?? ''
-  if (!token || !providerId) return new Response('Unauthorized', { status: 401 })
-  const provider = resolveOidcProvider(providerId, env)
-  const relayAudiences = (env.RELAY_TICKET_AUDIENCES || env.RELAY_TICKET_AUDIENCE || '')
-    .split(',').map(value => value.trim().toLowerCase()).filter(Boolean)
-  if (!provider || !env.RELAY_TICKET_SECRET || relayAudiences.length === 0 ||
-      !env.TURN_AUTH_SECRET || !env.TURN_URLS) {
-    return new Response('Network credentials are not configured', { status: 503 })
-  }
-  try {
-    const now = Date.now()
-    const claims = await verifyOidcToken(token, provider, fetch, now)
-    const deviceProof = await verifyDeviceRequest(request.headers, providerId, claims, now)
-    if (!deviceProof) throw new Error('invalid device proof')
-    const nowSeconds = Math.floor(now / 1000)
-    const expiresSeconds = Math.min(claims.exp, nowSeconds + 10 * 60)
-    const subjectDigest = bytesBase64Url(new Uint8Array(await crypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode(`${claims.iss}\n${claims.sub}\n${deviceProof.deviceKeyId}`)
-    ))).slice(0, 32)
-
-    const relayTickets = Object.fromEntries(await Promise.all([...new Set(relayAudiences)].map(async aud => {
-      const body = textBase64Url(JSON.stringify({ v: 1, aud, sub: subjectDigest, exp: expiresSeconds }))
-      const signature = bytesBase64Url(await hmac(env.RELAY_TICKET_SECRET, 'SHA-256', body))
-      return [aud, `${body}.${signature}`]
-    })))
-    const turnUsername = `${expiresSeconds}:${subjectDigest}`
-    const turnCredential = bytesBase64(await hmac(env.TURN_AUTH_SECRET, 'SHA-1', turnUsername))
-    const urls = env.TURN_URLS.split(',').map(value => value.trim()).filter(Boolean)
-    if (urls.length === 0) throw new Error('missing TURN urls')
-
-    const rendezvousId = env.RENDEZVOUS_SECRET && typeof claims.email === 'string'
-      ? bytesBase64Url(await hmac(
-          env.RENDEZVOUS_SECRET,
-          'SHA-256',
-          claims.email.trim().toLowerCase()
-        ))
-      : undefined
-    return Response.json({
-      relayTicket: relayTickets[relayAudiences[0]],
-      relayTickets,
-      iceServers: [
-        { urls: ['stun:stun.l.google.com:19302'] },
-        { urls, username: turnUsername, credential: turnCredential },
-      ],
-      expiresAt: expiresSeconds * 1000,
-      ...(rendezvousId ? { rendezvousId } : {}),
-    }, {
-      headers: {
-        'cache-control': 'no-store',
-        'x-content-type-options': 'nosniff',
-      },
-    })
-  } catch {
-    return new Response('Unauthorized', { status: 401 })
   }
 }

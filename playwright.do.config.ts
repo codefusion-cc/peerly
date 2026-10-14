@@ -49,7 +49,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'node server/test-server-do.mjs',
+    command: 'node server/test-server.mjs durable-objects',
     url: 'http://127.0.0.1:17275/.well-known/jwks.json',
     // Never reuse. The worker serves a build, so a server left over from an
     // earlier run serves that run's bundle — and the suite then passes or

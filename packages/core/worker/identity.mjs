@@ -1,4 +1,4 @@
-import { resolveOidcProvider, verifyDevicePayload, verifyOidcToken } from './networkCredentials.mjs'
+import { resolveOidcProvider, verifyDevicePayload, verifyOidcToken } from './oidc.mjs'
 import { deriveUserId } from '../dist/userId.js'
 
 const TTL_MS = 5 * 60_000

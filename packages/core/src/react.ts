@@ -29,7 +29,7 @@ import {
   type ClockFormat,
   type DateFormat,
 } from './format.js'
-import { ensureDurableObjectsSession } from './realtime/runtime.js'
+import { durableObjectsTurnAvailable, ensureDurableObjectsSession } from './realtime/runtime.js'
 
 type ClockFormatContextValue = {
   clockFormat: ClockFormat
@@ -468,7 +468,7 @@ import {
   joinRoomByCode,
   type Room,
 } from './joinRoom.js'
-import { getIceServers, getSupabaseRoomConfig, resolveRelayUrls } from './relays.js'
+import { getSupabaseRoomConfig } from './relays.js'
 import { resolveSignalingStrategy } from './signaling.js'
 import {
   createRoomMedia,
@@ -479,8 +479,7 @@ import {
 import { probeP2pCapability, type P2pCapability } from './p2pCapability.js'
 import { probeTurnCapability, type TurnCapability } from './turnCapability.js'
 import { createSpeakingDetector, type SpeakingDetector } from './speaking.js'
-import { createRelayCoordinator } from './coordination.js'
-import { createRelayChannel, type RelayChannelRoom } from './relayChannel.js'
+import type { RelayChannelRoom } from './relayChannel.js'
 import {
   openDurableChannel,
   type DurableChannelAuthorization,
@@ -569,7 +568,7 @@ export type UseRelayChannelOptions = {
   memberId: string
   env: Env
   onError?: (message: string) => void
-  /** Time without a coordinator acknowledgement before surfacing an error. */
+  /** Time without the lobby route opening before surfacing an error. */
   connectTimeoutMs?: number
   /** Authenticated non-persistent DO route for public lobby deployments. */
   durableEndpointPrefix?: string
@@ -577,9 +576,10 @@ export type UseRelayChannelOptions = {
 }
 
 /**
- * Server-forwarded public lobby transport. It intentionally mirrors the small
- * Room surface used by both apps while avoiding a WebRTC connection to every
- * signed-in stranger.
+ * Public lobby transport. Given a lobby route, messages are forwarded by the
+ * Durable Object, which avoids a WebRTC connection to every signed-in
+ * stranger; without one (and on the dev strategies) it is a P2P room keyed by
+ * the channel. Both expose the same small Room surface.
  */
 export function useRelayChannel(
   options: UseRelayChannelOptions
@@ -594,13 +594,12 @@ export function useRelayChannel(
     durableEndpointPrefix,
     durableRouteId,
   } = options
-  const durableObjects = resolveSignalingStrategy(env) === 'durable-objects'
-  const durableForwarder = durableObjects &&
+  const durableForwarder = resolveSignalingStrategy(env) === 'durable-objects' &&
     Boolean(durableEndpointPrefix && durableRouteId)
   const durableAuthAppId = durableForwarder ? requireAppId(env) : ''
-  const { room: durableP2pRoom } = useRoom({
+  const { room: p2pRoom } = useRoom({
     appId,
-    roomId: durableObjects && !durableForwarder ? channel : '',
+    roomId: durableForwarder ? '' : channel,
     password: channel,
     env,
     onError,
@@ -620,46 +619,11 @@ export function useRelayChannel(
     authorizationKey: durableRouteId,
     onError,
   })
-  const [room, setRoom] = useState<RelayChannelRoom | null>(null)
-  const onErrorRef = useRef(onError)
-  onErrorRef.current = onError
-  const envRef = useRef(env)
-  envRef.current = env
-
-  useEffect(() => {
-    if (durableObjects) {
-      setRoom(null)
-      return
-    }
-    if (!channel || !memberId) {
-      setRoom(null)
-      return
-    }
-    const coordinator = createRelayCoordinator(envRef.current)
-    const relayRoom = createRelayChannel(coordinator, channel, memberId)
-    let available = false
-    const unsubscribe = coordinator.subscribe(event => {
-      if (event.type === 'status') available = event.available
-    })
-    const timeout = window.setTimeout(() => {
-      if (!available) onErrorRef.current?.('The public relay is not responding. Retrying…')
-    }, connectTimeoutMs)
-    setRoom(relayRoom)
-    return () => {
-      window.clearTimeout(timeout)
-      unsubscribe()
-      relayRoom.leave()
-      coordinator.close()
-      setRoom(null)
-    }
-  }, [channel, memberId, connectTimeoutMs, durableObjects, setRoom])
 
   return {
-    room: durableObjects
-      ? durableForwarder
-        ? durableForwardedRoom
-        : durableP2pRoom as unknown as RelayChannelRoom | null
-      : room,
+    room: durableForwarder
+      ? durableForwardedRoom
+      : p2pRoom as unknown as RelayChannelRoom | null,
   }
 }
 
@@ -667,7 +631,6 @@ export type RoomErrorKind =
   | 'password-mismatch'
   | 'ice-failed'
   | 'needs-turn'
-  | 'relay-failed'
   | 'supabase-config'
   | 'generic'
 
@@ -704,15 +667,14 @@ const DEFAULT_ERROR_TEXT: Record<RoomErrorKind, (raw: string) => string> = {
   'ice-failed': () =>
     'Found the other peer, but the connection was interrupted. Waiting for them to reconnect.',
   'needs-turn': () =>
-    'Found the other peer but could not open a direct connection — one of you is on a network that blocks peer-to-peer (strict NAT or firewall). Check TURN reachability (UDP/TCP, external-ip, credentials).',
-  'relay-failed': raw => `Connection failed: ${raw}. Ensure the local relay is running.`,
+    'Found the other peer, but your networks block a direct connection and this server has no relay to route around it. Try another network, such as mobile data.',
   'supabase-config': () =>
     'Supabase signaling is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
   generic: raw => `Connection failed: ${raw}. Check your network or try again.`,
 }
 
 /**
- * TURN advice is only actionable when this build has no TURN configuration.
+ * TURN advice is only actionable when this tab has no TURN servers to use.
  * A generic post-SDP failure with TURN configured is commonly refresh/network
  * churn and must not claim that the TURN service is missing or unreachable.
  */
@@ -777,6 +739,25 @@ export type UseRoomOptions = {
 }
 
 /**
+ * The teardown under way for each room, across every component that joins it:
+ * Trystero hands a join of a room it has not let go of yet that same room,
+ * which the teardown then leaves. A component that replaces another (a
+ * remount) must wait for the old one's teardown as much as a rejoin must.
+ */
+const roomTeardowns = new Map<string, Promise<void>>()
+
+/**
+ * Waits until no teardown of the room is under way. Stops as soon as the
+ * waiting join is cancelled, since its own teardown is then the one under way.
+ */
+async function awaitRoomTeardown(key: string, cancelled: () => boolean): Promise<void> {
+  // Each teardown removes itself once done (see useRoom's cleanup).
+  for (let pending = roomTeardowns.get(key); pending && !cancelled(); pending = roomTeardowns.get(key)) {
+    await pending
+  }
+}
+
+/**
  * Join a room for the lifetime of the component. Handles the teardown/rejoin
  * race: `leave()` is async, and the Nostr strategy shares batched relay
  * subscriptions across rooms — a leave that lands *after* the next join has
@@ -799,12 +780,7 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
   const strategy = resolveSignalingStrategy(env)
   const roomScope = useMemo(() => ({ appId, roomId, password, strategy }), [appId, roomId, password, strategy])
   const [room, setRoom] = useConversationState<Room | null>(roomScope, () => null)
-  const [relayUrls, setRelayUrls] = useState<string[] | null>(() =>
-    strategy === 'ws-relay' ? null : []
-  )
   const instanceRef = useRef<Room | null>(null)
-  /** Resolves when the previous room has fully left; see setup() below. */
-  const teardownRef = useRef<Promise<void>>(Promise.resolve())
   const onErrorRef = useRef(onError)
   onErrorRef.current = onError
   const errorTextRef = useRef(errorText)
@@ -837,35 +813,18 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
   const turnDiagnosticRoomRef = useRef('')
 
   useEffect(() => {
-    if (strategy !== 'ws-relay') return
-
-    let cancelled = false
-    resolveRelayUrls(envRef.current).then(urls => {
-      if (!cancelled) setRelayUrls(urls)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [strategy])
-
-  // Only ws-relay re-joins when relay URLs resolve; other strategies ignore them.
-  const resolvedRelayUrls = strategy === 'ws-relay' ? relayUrls : null
-
-  useEffect(() => {
     // No room id yet means "not joined", not "join the '' room": hooks must be
     // called unconditionally, so callers whose room is not decided yet pass an
     // empty id. Joining anyway would put every such caller into one shared,
     // unprotected room per app id.
     if (!roomId) return
-    if (strategy === 'ws-relay' && (resolvedRelayUrls === null || resolvedRelayUrls.length === 0)) {
-      return
-    }
     if (strategy === 'supabase' && !getSupabaseRoomConfig(envRef.current)) {
       reportRef.current('supabase-config', '')
       return
     }
 
     let cancelled = false
+    const teardownKey = `${strategy}\n${appId}\n${roomId}`
 
     const scheduleRecovery = (remotePeerId?: string) => {
       const recovery = recoveryRef.current
@@ -900,7 +859,7 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
 
     const setup = async () => {
       // Wait for any previous room to finish leaving before joining again.
-      await teardownRef.current
+      await awaitRoomTeardown(teardownKey, () => cancelled)
       if (cancelled) return
 
       const joined = await joinRoomByCode({
@@ -909,7 +868,6 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
         roomId,
         password,
         env: envRef.current,
-        relayUrls: resolvedRelayUrls ?? undefined,
         handshakeTimeoutMs,
         onPeerHandshake,
         onJoinError: (details: { error?: unknown; appId?: string; peerId?: string }) => {
@@ -953,21 +911,20 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
               })
             }
             reportRef.current(
-              roomErrorKindForJoinError(kind, Boolean(getIceServers(envRef.current))),
+              roomErrorKindForJoinError(
+                kind,
+                strategy === 'durable-objects' && durableObjectsTurnAvailable(requireAppId(envRef.current))
+              ),
               msg
             )
             return
           }
-          if (strategy === 'ws-relay') {
-            reportRef.current('relay-failed', msg)
-          } else {
-            reportRef.current('generic', msg)
-          }
+          reportRef.current('generic', msg)
         },
       })
 
       if (cancelled) {
-        void joined.leave()
+        await joined.leave()
         return
       }
 
@@ -976,19 +933,25 @@ export function useRoom(options: UseRoomOptions): { room: Room | null } {
       setRoom(joined)
     }
 
-    void setup()
+    const joining = setup()
 
     return () => {
       cancelled = true
       const active = instanceRef.current
       instanceRef.current = null
-      if (active) {
-        // Record the teardown so the next join can await it rather than race it.
-        teardownRef.current = Promise.resolve(active.leave()).catch(() => {})
-      }
+      // Record the teardown so the next join can await it rather than race it.
+      // A join still under way leaves its room itself once it lands, so the
+      // next join waits for that join instead.
+      const teardown = active
+        ? Promise.resolve(active.leave()).catch(() => {})
+        : joining.catch(() => {})
+      roomTeardowns.set(teardownKey, teardown)
+      void teardown.then(() => {
+        if (roomTeardowns.get(teardownKey) === teardown) roomTeardowns.delete(teardownKey)
+      })
       setRoom(null)
     }
-  }, [appId, roomId, password, strategy, resolvedRelayUrls, onPeerHandshake, handshakeTimeoutMs, recoverIceFailures, rejoinNonce, setRoom])
+  }, [appId, roomId, password, strategy, onPeerHandshake, handshakeTimeoutMs, recoverIceFailures, rejoinNonce, setRoom])
 
   // A new room is a fresh start for recovery accounting; a pending rejoin
   // timer must not fire into a room it no longer belongs to.

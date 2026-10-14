@@ -1,6 +1,6 @@
 # Peerly
 
-Encrypted hybrid team collaboration. Production currently uses relay coordination and P2P chat; `preview.peerly.cc` runs the Durable Objects backend for encrypted channel state and recent chat history. File bodies and video calls use WebRTC in both modes. Built with [React](https://react.dev/), [Vite](https://vite.dev/), [Tailwind CSS](https://tailwindcss.com/) + [DaisyUI](https://daisyui.com/), [Cloudflare Workers](https://workers.cloudflare.com/), and [Trystero](https://github.com/dmotz/trystero). See the [production cutover runbook](docs/DURABLE_OBJECTS_CUTOVER.md) for rollout and rollback requirements.
+Encrypted hybrid team collaboration. Every deployment signals through a Cloudflare Worker with Durable Objects. Production (`peerly.cc`) keeps messages peer to peer; `preview.peerly.cc` also keeps encrypted channel state and recent chat history in Durable Objects. File bodies and video calls use WebRTC in both. Built with [React](https://react.dev/), [Vite](https://vite.dev/), [Tailwind CSS](https://tailwindcss.com/) + [DaisyUI](https://daisyui.com/), [Cloudflare Workers](https://workers.cloudflare.com/), and [Trystero](https://github.com/dmotz/trystero). See the [cutover runbook](docs/DURABLE_OBJECTS_CUTOVER.md) for rollout and rollback.
 
 Highlights: the reusable P2P and Durable Objects primitives ship as the npm package [`@peerly/core`](packages/core), while Peerly owns its product-specific authorization and event policies. The app also includes messenger attention, signed message actions, rich file/call workflows, channel management, an installable offline shell, URL routing, complete English/Polish UI, and accessibility hardening. The running app always shows its exact version and commit in the UI.
 
@@ -16,7 +16,7 @@ Per-screen behavior, routes, and major functions:
 - **Workspace appearance** — rename a workspace and upload a custom icon from workspace settings; stored locally per browser and shown in the sidebar and picker
 - **Light and dark themes** — follows the operating-system preference by default and stores an explicit choice per device
 - **Identity separate from workspace** — leave a workspace without losing your identity; return to the picker while remaining signed in
-- **Verified identity** — sign in with Google, Microsoft, Apple, or generic OIDC; the Worker verifies enrollment in Durable Objects mode and peers verify identity in P2P mode
+- **Verified identity** — sign in with Google, Microsoft, Apple, or generic OIDC; the Worker verifies enrollment and peers verify each other's identity in their handshake
 - **Creator-signed allow-list** — only invited email addresses can join; the exact signed revision is enforced by the Durable Object authorization boundary and by peer handshakes in P2P mode
 - **Creator-only invites** — only the device that created a workspace can add members to the allow-list; anyone can copy the invite link
 - **Device-bound auth** — ECDSA challenge-response prevents replayed identity tokens
@@ -30,7 +30,7 @@ Per-screen behavior, routes, and major functions:
 - **Storage visibility** — approximate browser quota, available space, pressure warnings, per-workspace usage, and separate actions for freeing cached originals or clearing local history
 - **Workspace backups** — exports signed workspace-channel history and access as JSON, then safely merges it back from the workspace picker
 - **Local sensitive-media screening** — NSFWJS checks image/video attachments and samples remote video streams locally; flagged media stays hidden until revealed
-- **Video calls** — incoming-call awareness, screen sharing, camera/microphone selection, and WebRTC media with TURN support for strict networks
+- **Video calls** — incoming-call awareness, screen sharing, camera/microphone selection, and WebRTC media relayed through Cloudflare TURN on strict networks
 - **Installable offline shell** — a service worker caches the production app shell and loaded release assets so local history remains reachable without signaling
 - **English and Polish UI** — the device language preference covers navigation, settings, chat, files, calls, storage, invites, confirmations, placeholders, and accessibility labels
 - **Approved-device sync** — the My Devices screen uses mutual, fingerprint-confirmed approval to link a second signed-in device; allowlisted local data then merges directly while both devices are online, and approved devices can sign edits/deletes of the account's earlier messages
@@ -54,12 +54,7 @@ cp .env.example .env   # add at least one identity provider (see below)
 npm run dev
 ```
 
-Open the printed URL in two browser tabs (or share an invite link). Peers connect in a few seconds over public Nostr signaling.
-
-```bash
-npm run dev:relay   # local WebSocket relay instead of Nostr (offline / CI-like)
-npm run stop        # kill common dev ports
-```
+Open the printed URL in two browser tabs (or share an invite link). Peers connect in a few seconds over public Nostr signaling, because the Vite dev server has no Worker to signal through. `npm run stop` kills the common dev ports.
 
 ### First-time flow
 
@@ -173,22 +168,21 @@ Files and call media remain P2P in both modes.
 
 | Mode | When | Config |
 |------|------|--------|
-| **Nostr** (default) | Dev & deploy — public signaling, no application server | None |
-| **ws-relay** | Offline / local CI | `npm run dev:relay` or `VITE_SIGNALING=ws-relay` |
-| **Supabase** | Relay you control | `VITE_SIGNALING=supabase` + Supabase URL/key |
-| **Durable Objects** (preview only) | Cloudflare-hosted control plane instead of a relay | `VITE_SIGNALING=durable-objects` against a Worker deployed with matching backend config — see below |
+| **Durable Objects** (default) | Every build served by the Worker, production and preview | None |
+| **Nostr** | `npm run dev`, which has no Worker | `VITE_SIGNALING=nostr`, optional `VITE_NOSTR_RELAYS` |
+| **Supabase** | Development against a Supabase project | `VITE_SIGNALING=supabase` + Supabase URL/key |
 
-`npm run test:e2e` uses a local relay (many connections from one IP would throttle public Nostr relays) and runs 4 workers in parallel — each worker gets its own workspace/room, so tests never meet each other. `npm run test:e2e:nostr` runs a small subset against public relays, deliberately serial.
+`VITE_NOSTR_RELAYS` replaces the dev server's curated Nostr relays. Members need at least one relay in common, so relay choice is build-time configuration, not a user setting.
 
-Deployment owners can replace the curated Nostr set with the build-time `VITE_NOSTR_RELAYS` variable. Peerly does **not** currently expose relay editing to end users: members need at least one signaling relay in common, so a safe user-facing design must distribute a workspace relay profile rather than silently changing one device.
+### Durable Objects control plane
 
-### Durable Objects control plane (preview)
+The Worker ([`worker/index.mjs`](worker/index.mjs), shared code in [`packages/core/worker/realtime`](packages/core/worker/realtime)) handles device enrollment, session cookies, presence, workspace and DM notifications, WebRTC signaling and ICE servers under `/api/network/*` and `/api/realtime/*`. Its Durable Objects are `UserGatewayDO`, `SignalScopeDO`, `ContentChannelDO` and `LobbyChannelDO`. With `CONTENT_BACKEND=durable-objects` the browser encrypts messages, reactions and channel definitions with the workspace or DM secret, and the server persists only ciphertext and bounded routing metadata before broadcasting it. File bytes and calls stay WebRTC peer to peer.
 
-A fourth signaling mode moves *coordination* — device enrollment, session cookies, presence, workspace/DM notifications, WebRTC signaling, and short-lived TURN credentials — off the self-hosted relay and onto a Cloudflare Worker backed by Durable Objects, served from `/api/network/*` and `/api/realtime/*` (see [`worker/index.mjs`](worker/index.mjs) and [`packages/core/worker/realtime`](packages/core/worker/realtime)). The preview deployment also enables the content Durable Object: the browser encrypts messages, reactions, and channel definitions with the workspace/DM secret; the server persists only ciphertext and bounded routing metadata before broadcasting it. File bytes and calls remain WebRTC P2P.
+[`wrangler.jsonc`](wrangler.jsonc) (production) and [`wrangler.preview.jsonc`](wrangler.preview.jsonc) (preview) differ only in `CONTENT_BACKEND`, names and migration history. Both require the secrets `RENDEZVOUS_SECRET`, `NETWORK_SESSION_SECRET`, `OPAQUE_USER_ID_SECRET`, `TURN_KEY_ID` and `TURN_KEY_API_TOKEN`. A client pointed at an unconfigured Worker fails closed with `503`, and a stale or invalid capability fails with `400`/`401`.
 
-`VITE_SIGNALING=durable-objects` only works against a Worker that was itself deployed with `COORDINATION_BACKEND=durable-objects`, the Durable Object bindings/migrations, and its own secrets (`NETWORK_SESSION_SECRET`, `OPAQUE_USER_ID_SECRET`, `TURN_AUTH_SECRET`, …). A client pointed at an unconfigured Worker fails closed with `503`, and a stale/invalid capability fails with `400`/`401` rather than degrading silently. Production (`peerly.cc`) still runs `COORDINATION_BACKEND=legacy-relay`; only the stable preview deployment (`preview.peerly.cc`, via [`wrangler.preview.jsonc`](wrangler.preview.jsonc)) runs the Durable Objects path today, ahead of a full production cutover.
+When a Durable Object restarts, for example on every deploy, an open room's scope socket reopens by itself after 1, 2, 5 and 10 seconds, then every 30 seconds, with jitter. Peers that are already connected keep talking directly meanwhile.
 
-`npm run deploy:preview` deploys `peerly-preview` through [`wrangler.preview.jsonc`](wrangler.preview.jsonc), whose build enables both DO signaling and DO content and writes `dist-preview/`, so a preview deploy never touches production's `dist/`. It runs from the Mac through the CodeFusion Console CLI rather than `wrangler login`, whose token reaches the whole account:
+`npm run deploy:preview` deploys `peerly-preview` through `wrangler.preview.jsonc`, whose build writes `dist-preview/`, so a preview deploy never touches production's `dist/`. It runs from the Mac through the CodeFusion Console CLI rather than `wrangler login`, whose token reaches the whole account:
 
 ```bash
 cd /Users/xeon/Projects/Peerly && codefusion-console cloudflare workers:edit,domains:edit -- npm run deploy:preview
@@ -196,42 +190,31 @@ cd /Users/xeon/Projects/Peerly && codefusion-console cloudflare workers:edit,dom
 
 `codefusion-console cloudflare <scope>[,<scope>…] [--ttl 30m] -- <command>` mints a token with exactly those scopes for that one command (two hours by default), hands it over as `CLOUDFLARE_API_TOKEN` with `CLOUDFLARE_ACCOUNT_ID`, and deletes it when the command exits; a token with an `:edit` scope waits for the owner's passkey tap on Dispatch. The preview deploy needs `workers:edit` and `domains:edit` (its `preview.peerly.cc` custom domain); its secrets (`codefusion-console cloudflare workers:edit -- npx wrangler secret put <NAME> -c wrangler.preview.jsonc`) need `workers:edit`. Once per Mac: `npm install -g @codefusion-cc/console && codefusion-console relay install`.
 
-This control plane is shared code in [`packages/core/worker/realtime`](packages/core/worker/realtime) and [`packages/core/src/realtime`](packages/core/src/realtime): Peerly and HeyHubs each deploy their own Worker and Durable Object namespaces from it, with independent secrets and data. See [docs/DURABLE_OBJECTS_ARCHITECTURE.md](docs/DURABLE_OBJECTS_ARCHITECTURE.md) for the full design, or [docs/RELAY_VS_DURABLE_OBJECTS.md](docs/RELAY_VS_DURABLE_OBJECTS.md) for a comparison against the relay stack production still runs.
+Peerly and HeyHubs each deploy their own Worker and Durable Object namespaces from the shared code in `packages/core/worker/realtime` and [`packages/core/src/realtime`](packages/core/src/realtime), with independent secrets and data. [docs/DURABLE_OBJECTS_ARCHITECTURE.md](docs/DURABLE_OBJECTS_ARCHITECTURE.md) has the full design.
 
-`npm run test:e2e:do` drives it the way a user would: it builds the app with the DO backend, serves that build from the real Worker on localhost with real Durable Objects, and runs two browser contexts against it. Test-only sign-in there is *configuration* — a generic `oidc` provider whose JWKS is served from the build, set only in [`wrangler.e2e.jsonc`](wrangler.e2e.jsonc). A deployment that sets none of those variables resolves the provider to `null` and the route 503s, so it cannot be switched on by accident.
+`npm run test:e2e` and `npm run test:e2e:do` drive it the way a user would: each builds the app, serves the build from the real Worker on localhost with real Durable Objects, and runs browser contexts against it, with peer-to-peer content and Durable Objects content respectively. Test-only sign-in there is configuration: a generic `oidc` provider whose JWKS is served from the build, set only in [`wrangler.e2e.jsonc`](wrangler.e2e.jsonc). A deployment that sets none of those variables resolves the provider to `null` and the route answers `503`, so it cannot be switched on by accident.
 
-What that suite cannot prove is TURN: two browser contexts on one host connect over host candidates and never reach a relay. `npm run turn:smoke` covers that separately by asking coturn for a real allocation, with no browser involved.
+[docs/REWRITE_ARCHITECTURE.md](docs/REWRITE_ARCHITECTURE.md) records how this was built and what remains; [docs/DURABLE_OBJECTS_CUTOVER.md](docs/DURABLE_OBJECTS_CUTOVER.md) covers rollout and rollback.
 
-[docs/REWRITE_ARCHITECTURE.md](docs/REWRITE_ARCHITECTURE.md) records how this was built and what remains; [docs/DURABLE_OBJECTS_CUTOVER.md](docs/DURABLE_OBJECTS_CUTOVER.md) is the step-by-step for putting it in front of users.
+### TURN
 
-### TURN (optional)
+Calls use Cloudflare Realtime TURN through [`@codefusion-cc/realtime-media`](https://www.npmjs.com/package/@codefusion-cc/realtime-media). The Worker holds a TURN key (`TURN_KEY_ID`, `TURN_KEY_API_TOKEN`), provisioned through CodeFusion Console and never set by hand. Each control session response from `/api/network/session` carries `ice: { servers, ttlMs }`: Cloudflare STUN plus TURN credentials valid for one hour (the browser counts `ttlMs` on its own clock), renewed at every session refresh ([`worker/realtime/ice.mjs`](worker/realtime/ice.mjs)). Without a key, or when Cloudflare's API fails or takes longer than 3 seconds, the session gets Cloudflare STUN only and the Worker logs the failure.
 
-For strict NAT / corporate firewalls, configure your TURN URLs. The browser
-obtains short-lived REST credentials from `/api/network/credentials` — or, on
-the `durable-objects` signaling mode above, from `/api/network/session`
-instead, using the same `TURN_AUTH_SECRET`:
+The browser accepts only Cloudflare's own STUN and TURN URLs, drops TURN a minute before it expires, and gives peers created later the renewed credentials.
 
-```bash
-VITE_TURN_URLS=turn:your-turn.example:3478,turns:your-turn.example:5349 \
-npm run build
-```
-
-Core expands conventional TURN endpoints into UDP `3478`, TCP `3478`, TLS
-`5349`, and TLS `443` candidates. Expose TURN/TLS on `443` for networks that
-block non-HTTPS ports; with one public IP, route TCP by TLS SNI so `turn.*`
-reaches coturn and `relay.*` continues to reach HTTPS/WSS.
+Two checks catch a key that stopped working: a cron every five minutes, and the public, rate-limited `GET /api/media/health`. `npm run verify:production` checks HSTS and that endpoint; CI runs it after every production deploy. Browser tests on one host connect over host candidates, so they never exercise TURN itself.
 
 ## Deploy
 
-Peerly's UI is a static SPA. A P2P-only build can serve `dist/` from any static
-host; Durable Objects mode must be served by the configured Worker so its
-authenticated `/api/realtime/*` routes and bindings are available.
+Peerly's UI is a static SPA served by its Worker, which also answers the
+authenticated `/api/network/*` and `/api/realtime/*` routes the client signals
+through.
 
 ```bash
 npm run build
 ```
 
-Output goes to `dist/`. The build runs a bundle guard that fails if E2E test key material leaked into the production bundle.
+Output goes to `dist/`. The build runs a bundle guard that fails if E2E test key material, a retired static credential, or a hostname of the retired self-hosted relay or TURN server reached the bundle.
 
 ### Cloudflare Workers Static Assets (recommended)
 
@@ -240,10 +223,9 @@ The committed [`wrangler.jsonc`](wrangler.jsonc) deploys `dist/` with an SPA fal
 GitHub Actions deploys it: every push to `main` that passes the `test` job runs
 the `deploy` job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 (environment `production`, one deploy at a time, never cancelled). It runs
-`npm run build` with production's build-time variables, which the workflow
-lists (the Google client ID, `VITE_SIGNALING=ws-relay` with `relay.peerly.cc:443`,
-and the TURN hosts), then `npx wrangler deploy`, then waits until peerly.cc
-serves the new entry script. Branches are not deployed; test them on
+`npm run build` with the Google client ID, the only build-time variable
+production needs, then `npx wrangler deploy`, waits until peerly.cc serves the
+new entry script, and runs `npm run verify:production`. Branches are not deployed; test them on
 preview.peerly.cc (below). The build shows `GITHUB_SHA` in the UI as
 `v<version> · <commit>`.
 
@@ -254,8 +236,6 @@ the Worker, lost its GitHub connection when the repository moved to
 codefusion-cc and deploys nothing.
 
 Register the production origin (`https://peerly.cc`) in each OAuth provider's allowed JavaScript origins / redirect URIs.
-
-Cloudflare Pages also works: use `npm run build`, publish `dist/`, and set the same build-time environment variables.
 
 ### Testing branches with Google sign-in
 
@@ -286,11 +266,7 @@ Both Workers report to [CodeFusion Console](https://console.codefusion.cc) as th
 codefusion-console secrets peerly
 ```
 
-`codefusion-console provision_secrets peerly staging cloudflare-turn-key` creates a TURN key and writes both TURN secrets of `peerly-preview` once the owner approves it on Dispatch.
-
-### Other hosts
-
-Vercel, Netlify, S3 + CloudFront, etc. work the same way: `npm run build`, publish `dist/`, set `VITE_*` env vars at build time, register OAuth origins.
+`codefusion-console provision_secrets peerly production cloudflare-turn-key` (or `staging`) creates a TURN key and writes both TURN secrets of that Worker once the owner approves it on Dispatch.
 
 ## Tech stack
 
@@ -298,7 +274,7 @@ Vercel, Netlify, S3 + CloudFront, etc. work the same way: `npm run build`, publi
 |-------|--------|
 | UI | React 19, Tailwind CSS 4, DaisyUI 5 (custom `peerly` light and `peerly-dark` themes) |
 | Build | Vite 8, TypeScript 6 |
-| P2P | Trystero (`@trystero-p2p/*`) — Nostr / ws-relay / Supabase signaling |
+| Realtime | Cloudflare Workers and Durable Objects for signaling, Cloudflare Realtime TURN, Trystero (`@trystero-p2p/*`) with Nostr or Supabase signaling in development |
 | Crypto | Web Crypto — ECDSA device keys, JWT verification via JWKS, creator-signed allow-lists |
 | Storage | localStorage (session, workspace list, messages, indexes), IndexedDB (device keys, file bodies, avatars) |
 | Media safety | Lazy NSFWJS MobileNetV2 inference in the browser |
@@ -326,16 +302,14 @@ npm Trusted Publishing with provenance, automatic version bump via release PR.
 ├── docs/                   views.md (screens & functions), implementation notes
 ├── public/                 Static assets (favicon, etc.)
 ├── scripts/
-│   ├── guard-bundle.mjs    Fail build if E2E keys reached dist/
+│   ├── guard-bundle.mjs    Fail build if E2E keys or retired hostnames reached dist/
 │   ├── emit-e2e-jwks.mjs   Publish the E2E issuer's JWKS into dist/ (E2E only)
 │   ├── check-csp.mjs       Serve dist with CSP, test a negative control + offline shell
-│   └── check-relays.mjs    Nostr relay health diagnostic
-├── server/                 Dev relay, test servers, process helpers
+│   ├── check-relays.mjs    Nostr relay health diagnostic
+│   └── verify-production.mjs  HSTS and Cloudflare TURN health of a deployment
+├── server/                 Dev and test servers, process helpers
 │   ├── dev.mjs             npm run dev (Nostr signaling)
-│   ├── dev-relay.mjs       npm run dev:relay
-│   ├── relay.mjs           WebSocket signaling relay
-│   ├── test-server.mjs     E2E: relay + Vite with auth bypass
-│   └── test-server-do.mjs  E2E: built app behind the real Worker + Durable Objects
+│   └── test-server.mjs     E2E: built app behind the real Worker + Durable Objects (p2p or durable-objects content)
 ├── src/
 │   ├── collab/             P2P protocol, crypto, identity, stores
 │   ├── components/         React UI (join, settings, storage, chat, files, video)
@@ -344,16 +318,16 @@ npm Trusted Publishing with provenance, automatic version bump via release PR.
 │   ├── utils/              Storage, blobs, hashing
 │   ├── index.css           Tailwind + DaisyUI theme
 │   ├── App.tsx             Session bootstrap, workspace routing
-│   ├── config.ts           Room / relay / build label
+│   ├── config.ts           Room / signaling / build label
 │   └── session.ts          Active workspace session persistence
 ├── build-info.mjs          Version + commit injected at build time
 ├── .env.example            Environment template (copy to .env)
 ├── .nvmrc                  Node 24.18.0 (npm 11.16.0 / CI alignment)
-├── playwright.config.ts
+├── playwright.config.ts    Browser suite against production's shape (serial)
 ├── playwright.do.config.ts Durable Objects browser suite (own target, serial)
 ├── vite.config.ts
-├── wrangler.jsonc          Production: SPA assets and API routing
-├── wrangler.preview.jsonc  Staging with Durable Objects (preview.peerly.cc)
+├── wrangler.jsonc          Production (peerly.cc): Durable Objects signaling, p2p content
+├── wrangler.preview.jsonc  Preview (preview.peerly.cc): Durable Objects content too
 ├── wrangler.e2e.jsonc      Local-only DO target for the browser suite
 └── vitest.config.ts
 ```
@@ -363,7 +337,6 @@ npm Trusted Publishing with provenance, automatic version bump via release PR.
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Vite + public Nostr signaling |
-| `npm run dev:relay` | Vite + local WebSocket relay |
 | `npm run dev:app` | Vite only, using the signaling strategy from the environment |
 | `npm run stop` | Stop the common local Peerly development ports |
 | `npm run build` | Typecheck + production build + bundle guard |
@@ -371,15 +344,14 @@ npm Trusted Publishing with provenance, automatic version bump via release PR.
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run typecheck` | `tsc -b` across every project (the root config is solution-style, so `tsc -p` alone checks nothing) |
 | `npm run test:workers` | Durable Object behaviour against real workerd |
-| `npm run test:e2e` | Playwright E2E (local relay; parallel workers per Playwright config) |
-| `npm run test:e2e:do` | Two browsers against the real Worker and real Durable Objects |
-| `npm run test:e2e:nostr` | E2E subset over public Nostr |
+| `npm run test:e2e` | Playwright E2E against the real Worker and Durable Objects, p2p content |
+| `npm run test:e2e:do` | The same with Durable Objects content |
 | `npm run test:e2e:ui` | Playwright interactive UI |
-| `npm run turn:smoke -- <urls>` | Ask coturn for a real TURN allocation per transport. Needs `TURN_AUTH_SECRET` |
+| `npm run verify:production` | Check a deployment's HSTS and Cloudflare TURN health (`PRODUCTION_SITE_URL`, default peerly.cc) |
 | `npm run preview` | Preview the production build locally |
 | `npm run check:relays` | Health-check the default Nostr relays |
 | `npm run check:csp` | Verify production CSP, its inline-script negative control, and the offline shell |
-| `npm run guard:bundle` | Fail if test key material reached `dist/` (runs in `build`) |
+| `npm run guard:bundle` | Fail if test key material or retired hostnames reached `dist/` (runs in `build`) |
 | `npm run lint` | oxlint |
 
 The app shows its version and commit (`v<version> · <commit>`) on the join screen and
@@ -402,11 +374,11 @@ working until two peers fail to find each other.
 - **Device approval is explicit** — sharing an account login does not grant one device authority over another device's messages. Both devices must confirm a one-time pairing, exchange reciprocal signed grants, and retain those grants locally. Continuous sync is peer-to-peer and only runs while approved devices are simultaneously online; account sessions and identity tokens are never copied.
 - **Security headers** — a strict Content-Security-Policy ships via `public/_headers`; CI serves the production bundle with those headers, asserts zero startup violations, and proves its negative control is blocked.
 - **Inviting is creator-only** — the allow-list is only accepted if it verifies against the workspace's creator key, and that key never leaves the browser profile that created the workspace. A second device, even the creator's, cannot add members.
-- **Revocation is monotonic in Durable Objects mode** — a newer creator-signed allow-list replaces the previous authority and removed members' live sockets are closed; the P2P rollback retains eventual peer-learned revocation
+- **Revocation is monotonic in Durable Objects mode** — a newer creator-signed allow-list replaces the previous authority and removed members' live sockets are closed; with peer-to-peer content, revocation is learned from peers and so eventual
 - **Live messages** — attributed by transport peer id, not payload `senderId`
 - **Legacy history** — unsigned entries from older versions retain readable text but lose durable identity claims; newly authored entries are signed and verified
 - **Local media classification** — sensitive-media screening never uploads frames, but it is advisory and fails open rather than acting as a moderation authority
-- **Relay metadata** — signaling relays do not receive message/file bodies, but relay and TURN operators can still observe connection metadata such as IP addresses, timing, and traffic volume
+- **Connection metadata** — signaling never carries file bodies, and in production not message bodies either, but Cloudflare as signaling and TURN operator can still observe connection metadata such as IP addresses, timing, and traffic volume
 - **Production bundle guard** — E2E fake-issuer keys are isolated and scanned out of `dist/` on every build
 
 ## Design limits
@@ -416,8 +388,8 @@ Hybrid storage and transport trade-offs:
 - **Durable history is bounded** — encrypted event envelopes retain for at most 30 days and the latest 1,000 events per workspace or DM; this is reliable delivery and recent history, not a permanent archive
 - **File availability remains peer-owned** — metadata can outlive an online sender, but file bodies live in local copies and transfer only while a member holding the content is reachable
 - **Transfers are whole-file** — file bodies are content-addressed and integrity-checked; resumable byte-range transfer is traded away for that simplicity, and join progress is channel-based rather than byte-accurate.
-- **P2P rollback revocation is eventual** — a removed member stops being admitted as devices learn the newer creator-signed list; Durable Objects mode closes existing revoked sockets immediately after accepting a newer signed authority revision
-- **Relays are deployment-time configuration** — members need at least one signaling relay in common, so per-user relay editing could silently partition a workspace. Overrides exist at build time instead.
+- **Peer-to-peer revocation is eventual** — a removed member stops being admitted as devices learn the newer creator-signed list; Durable Objects mode closes existing revoked sockets immediately after accepting a newer signed authority revision
+- **Calls on strict networks need TURN** — without a working TURN key a session gets STUN only, and peers behind strict NAT or firewalls cannot reach each other until the key works again
 - **Moderation stays on your device** — local NSFW screening is advisory; the server holds ciphertext without the workspace/DM key and therefore cannot inspect content
 
 ## CI
@@ -426,9 +398,10 @@ GitHub Actions on push/PR to `main` / `master` (see [.github/workflows/ci.yml](.
 
 1. Install Node `24.18.0` with its bundled npm `11.16.0`, then verify both exact versions.
 2. Run a clean `npm ci` from the committed lockfile.
-3. Run lint and 210 unit/component tests.
-4. Run the TypeScript/Vite production build and bundle guard.
-5. Install Chromium, verify CSP plus the offline shell, and run all 50 Playwright tests against the local relay (2 parallel workers in CI, each with an isolated workspace).
+3. Run the production audit, lint, unit and Worker tests, and coverage.
+4. Run the TypeScript/Vite production build and bundle guard, then `worker:check`.
+5. Install Chromium, verify CSP plus the offline shell, and run both Playwright suites against the real Worker and Durable Objects.
+6. On `main`, after the mutation job, deploy production and run `npm run verify:production`.
 
 `package.json` `devEngines`, `.npmrc`, `.nvmrc`, and CI all enforce the same toolchain. A mismatched Node or npm exits before it can rewrite `package-lock.json`.
 

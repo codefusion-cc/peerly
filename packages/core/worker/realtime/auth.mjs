@@ -1,7 +1,7 @@
-import { resolveOidcProvider, verifyOidcToken } from '../networkCredentials.mjs'
+import { resolveOidcProvider, verifyOidcToken } from '../oidc.mjs'
 import {
   deriveOpaqueUserId, derivePrivateMemberId, deviceProofBytes, mintCapability, mintCookie,
-  mintTurnCredential, readNetworkCookie, serializeNetworkCookie, sha256Hex,
+  readNetworkCookie, serializeNetworkCookie, sha256Hex,
   verifyCapability, verifyCookie, verifyDeviceSignature,
 } from './crypto.mjs'
 import { LIMITS } from '../../dist/protocol/index.js'
@@ -242,10 +242,12 @@ export async function handleSession(request, env, config) {
     privateMemberId: claims.member,
     deviceKeyId, sid: claims.sid, now, ttlMs: LIMITS.cookieTtlMs,
   })
-  const turn = await mintTurnCredential(env, { subject: claims.uid, now, ttlMs: LIMITS.cookieTtlMs })
+  // The ICE servers ride the session, so the refresh that renews the cookie
+  // every `sessionRefreshMs` renews them too, well inside their lifetime.
+  const ice = config.iceServers ? await config.iceServers(env) : null
 
   return json(
-    { runtimeConfig: { protocolVersion: LIMITS.protocolVersion }, ...(turn ? { turn } : {}) },
+    { runtimeConfig: { protocolVersion: LIMITS.protocolVersion }, ...(ice ? { ice } : {}) },
     { headers: { 'set-cookie': serializeNetworkCookie(cookie, LIMITS.cookieTtlMs) } }
   )
 }

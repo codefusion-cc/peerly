@@ -1,8 +1,8 @@
-import { getRelaySockets as getNostrSockets } from '@trystero-p2p/nostr'
+import type { getRelaySockets } from '@trystero-p2p/nostr'
 import { isRealtimeTransportOnline } from './realtime/liveness.js'
 import type { SignalingStrategy } from './signaling.js'
 
-type SocketMap = ReturnType<typeof getNostrSockets>
+type SocketMap = ReturnType<typeof getRelaySockets>
 
 export type RelayHealth = {
   getConnectedRelayUrls(): string[]
@@ -15,19 +15,13 @@ export type RelayHealth = {
  * library cannot read the app's env at import time.
  */
 export function createRelayHealth(strategy: SignalingStrategy): RelayHealth {
-  let wsGetSockets: (() => SocketMap) | null = null
-
-  if (strategy === 'ws-relay') {
-    void import('@trystero-p2p/ws-relay').then(module => {
-      wsGetSockets = module.getRelaySockets
+  // Loaded only on the Nostr dev strategy, so a deployment's bundle does not
+  // carry the Nostr client.
+  let nostrSockets: (() => SocketMap) | null = null
+  if (strategy === 'nostr') {
+    void import('@trystero-p2p/nostr').then(module => {
+      nostrSockets = module.getRelaySockets
     })
-  }
-
-  function getRelaySockets(): SocketMap {
-    if (strategy === 'ws-relay') {
-      return wsGetSockets?.() ?? {}
-    }
-    return getNostrSockets()
   }
 
   function getConnectedRelayUrls(): string[] {
@@ -40,8 +34,7 @@ export function createRelayHealth(strategy: SignalingStrategy): RelayHealth {
       return isRealtimeTransportOnline() ? ['durable-objects-control'] : []
     }
 
-    const sockets = getRelaySockets()
-    return Object.entries(sockets)
+    return Object.entries(nostrSockets?.() ?? {})
       .filter(([, socket]) => (socket as WebSocket).readyState === WebSocket.OPEN)
       .map(([url]) => url)
   }

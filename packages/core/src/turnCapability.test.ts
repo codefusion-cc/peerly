@@ -3,19 +3,39 @@ import { probeTurnCapability, resolveProbeIceServers } from './turnCapability.js
 
 vi.mock('./realtime/runtime.js', () => ({
   getDurableObjectsIceServers: vi.fn(async () => [{
-    urls: ['turn:turn.example:3478'], username: 'do-user', credential: 'do-credential',
+    urls: ['turn:turn.cloudflare.com:3478?transport=udp'], username: 'do-user', credential: 'do-credential',
   }]),
 }))
+
+const TURN = [{
+  urls: ['turn:turn.cloudflare.com:3478?transport=udp'], username: 'user', credential: 'pass',
+}]
+
+class FakePeerConnection {
+  static created: RTCConfiguration[] = []
+  onicecandidate: ((event: { candidate: { type: string; protocol: string } | null }) => void) | null = null
+  onicecandidateerror: ((event: { errorText?: string }) => void) | null = null
+  constructor(config: RTCConfiguration) { FakePeerConnection.created.push(config) }
+  createDataChannel() {}
+  async createOffer() { return {} }
+  async setLocalDescription() {
+    queueMicrotask(() => this.onicecandidate?.({ candidate: { type: 'relay', protocol: 'tcp' } }))
+  }
+  close() {}
+}
 
 describe('probeTurnCapability', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it('does not probe when TURN is absent', async () => {
-    await expect(probeTurnCapability({})).resolves.toEqual({
+  it('does not probe when the deployment hands out STUN alone', async () => {
+    FakePeerConnection.created = []
+    vi.stubGlobal('RTCPeerConnection', FakePeerConnection)
+    await expect(probeTurnCapability({}, 20, async () => [{ urls: ['stun:stun.cloudflare.com:3478'] }])).resolves.toEqual({
       status: 'not-configured',
       detail: 'TURN is not configured.',
       transports: [],
     })
+    expect(FakePeerConnection.created).toEqual([])
   })
 
   it('turns browser policy failures into an unavailable result', async () => {
@@ -25,9 +45,9 @@ describe('probeTurnCapability', () => {
       }
     })
     await expect(probeTurnCapability(
-      { VITE_TURN_URLS: 'turn:turn.example:3478' },
+      {},
       20,
-      async () => [{ urls: ['turn:turn.example:3478'], username: 'user', credential: 'pass' }]
+      async () => TURN
     )).resolves.toMatchObject({
       status: 'unavailable',
       detail: expect.stringContaining('blocked by administrator'),
@@ -39,7 +59,7 @@ describe('probeTurnCapability', () => {
     vi.stubGlobal('RTCPeerConnection', PeerConnection)
 
     await expect(probeTurnCapability(
-      { VITE_TURN_URLS: 'turn:turn.example:3478' },
+      {},
       20,
       async () => undefined
     )).resolves.toMatchObject({
@@ -50,47 +70,30 @@ describe('probeTurnCapability', () => {
   })
 
   it('succeeds on the first relay candidate without waiting for gathering to finish', async () => {
-    class FakePeerConnection {
-      onicecandidate: ((event: { candidate: { type: string; protocol: string } | null }) => void) | null = null
-      onicecandidateerror: ((event: { errorText?: string }) => void) | null = null
-      createDataChannel() {}
-      async createOffer() { return {} }
-      async setLocalDescription() {
-        queueMicrotask(() => this.onicecandidate?.({ candidate: { type: 'relay', protocol: 'tcp' } }))
-      }
-      close() {}
-    }
+    FakePeerConnection.created = []
     vi.stubGlobal('RTCPeerConnection', FakePeerConnection)
 
-    await expect(probeTurnCapability(
-      { VITE_TURN_URLS: 'turn:turn.example:3478' },
-      20,
-      async () => [{
-        urls: ['turn:turn.example:3478'],
-        username: 'runtime-user',
-        credential: 'runtime-credential',
-      }]
-    )).resolves.toEqual({
+    await expect(probeTurnCapability({}, 20, async () => TURN)).resolves.toEqual({
       status: 'available',
       detail: 'TURN relay allocation succeeded (tcp).',
       transports: ['tcp'],
     })
+    expect(FakePeerConnection.created).toEqual([{ iceServers: TURN, iceTransportPolicy: 'relay' }])
   })
 })
 
 describe('resolveProbeIceServers', () => {
-  it('sources credentials from the Durable Objects session under that strategy', async () => {
-    await expect(resolveProbeIceServers({
-      VITE_SIGNALING: 'durable-objects',
-      VITE_APP_ID: 'consumer-app',
-    })).resolves.toEqual([{
-      urls: ['turn:turn.example:3478'], username: 'do-user', credential: 'do-credential',
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('takes the servers from the Durable Objects session, the default strategy', async () => {
+    await expect(resolveProbeIceServers({ VITE_APP_ID: 'consumer-app' })).resolves.toEqual([{
+      urls: ['turn:turn.cloudflare.com:3478?transport=udp'], username: 'do-user', credential: 'do-credential',
     }])
   })
 
-  it('falls back to the legacy relay-ticket endpoint for other strategies', async () => {
-    // No auth credential provider is configured in this test, so the legacy
-    // path resolves to undefined without ever touching the DO runtime mock.
-    await expect(resolveProbeIceServers({ VITE_SIGNALING: 'nostr' })).resolves.toBeUndefined()
+  it('has no TURN to test on the dev strategies', async () => {
+    vi.stubGlobal('RTCPeerConnection', FakePeerConnection)
+    await expect(resolveProbeIceServers({ VITE_SIGNALING: 'nostr' })).resolves.toEqual([])
+    await expect(probeTurnCapability({ VITE_SIGNALING: 'nostr' }, 20)).resolves.toMatchObject({ status: 'not-configured' })
   })
 })

@@ -2,54 +2,36 @@
 
 Status: implemented in `@peerly/core` and Peerly's own Worker (enrollment,
 session, control/signaling Durable Objects, plus Peerly's authorized encrypted
-content channel). Peerly preview (`wrangler.preview.jsonc`,
-`preview.peerly.cc`) defaults both coordination and content to Durable Objects.
-The P2P content adapter remains an explicit build/deploy rollback, and file
-bodies plus call media remain P2P in every mode. Production (`peerly.cc`) stays
-unchanged until a separate production-cutover request. HeyHubs' rollout status
-lives in its own repo.
+content channel). Every Peerly build signals through Durable Objects.
+Production (`peerly.cc`) keeps message content peer to peer
+(`CONTENT_BACKEND=p2p`); preview (`preview.peerly.cc`) keeps it in Durable
+Objects. File bodies and call media are peer to peer everywhere, and TURN is
+Cloudflare Realtime TURN. HeyHubs' rollout status lives in its own repo.
 Date: 2026-07-29
 Applies to: Peerly and `@peerly/core`; other apps consume the generic core primitives through their own adapters
 
 This document decides what to build and why; the code in `packages/core`
-is the reference for exact wire formats and storage. See
-[RELAY_VS_DURABLE_OBJECTS.md](./RELAY_VS_DURABLE_OBJECTS.md) for a detailed,
-dimension-by-dimension comparison against the relay stack production still
-runs.
+is the reference for exact wire formats and storage.
 
 ## Decision
 
-Move the application control plane from the self-hosted Node/WebSocket relay to
-Cloudflare Workers and SQLite-backed Durable Objects (DOs). For Peerly,
-client-encrypted messages, reactions, and channel definitions use an authorized
-Durable Object by default: persist first, acknowledge, then fan out and replay
-bounded recent history. Keep file bodies and call media peer-to-peer over
-WebRTC, and keep the complete message/history P2P adapter as an explicit
-deployment rollback. The server never receives the workspace/DM encryption key.
+The application control plane runs on Cloudflare Workers and SQLite-backed
+Durable Objects (DOs). For Peerly, client-encrypted messages, reactions, and
+channel definitions can use an authorized Durable Object: persist first,
+acknowledge, then fan out and replay bounded recent history. Production keeps
+the peer-to-peer message/history adapter until the content cutover
+([DURABLE_OBJECTS_CUTOVER.md](./DURABLE_OBJECTS_CUTOVER.md)). File bodies and
+call media stay peer to peer over WebRTC. The server never receives the
+workspace/DM encryption key.
 
-The existing relay is now maintenance-only:
-
-- Allowed: security, correctness, dependency, protocol-compatibility, and
-  operational fixes.
-- Not allowed: new commands, new stored state, new product features, new
-  coordination responsibilities, or new consumers.
-- It remains an explicit rollback backend during the DO rollout. Clients never
-  write to both backends at once.
-- After the DO path meets the exit criteria in this plan, the relay service and
-  its HTTP/WebSocket proxy are disabled on the VPS. The source stays available
-  for emergency rollback and fixes until a later removal decision.
-
-The new backend is configurable, but it will not be a dormant experiment.
-Production changes to `durable-objects` in the first complete rollout:
-
-```text
-COORDINATION_BACKEND=durable-objects
-LEGACY_RELAY_ENABLED=false
-```
-
-An emergency deployment may set `COORDINATION_BACKEND=legacy-relay`. Automatic
-per-client relay fallback is deliberately excluded because it would split
+Signaling has one backend: `VITE_SIGNALING` defaults to `durable-objects`, and
+`nostr` and `supabase` exist only for development servers without a Worker.
+There is no per-client fallback to another backend, which would split
 presence, matchmaking, and room directories across two authorities.
+
+The Worker mints Cloudflare Realtime TURN credentials per control session
+through `@codefusion-cc/realtime-media`; there is no self-hosted TURN or relay
+server.
 
 ## Goals and non-goals
 
@@ -61,7 +43,7 @@ presence, matchmaking, and room directories across two authorities.
 - Durable, idempotent matching and room-directory operations.
 - Established P2P sessions continue if the control plane is temporarily
   unavailable.
-- No static relay or TURN credential in a browser bundle.
+- No static signaling or TURN credential in a browser bundle.
 - Low latency, bounded work, bounded storage, and explicit overload behavior.
 - Stay within the Cloudflare Workers Free plan at current traffic, with quota
   alarms and a documented paid-plan threshold instead of silent failure.
@@ -73,9 +55,8 @@ presence, matchmaking, and room directories across two authorities.
 - Durable Objects do not carry WebRTC audio/video or file bodies.
 - Durable Objects are not a plaintext content store or a permanent archive:
   event envelopes are end-to-end encrypted and bounded by time and count.
-- The migration does not add features to the legacy relay.
-- “Free” is not treated as unlimited or as an availability SLA. TURN VPS and
-  bandwidth costs remain outside the Cloudflare application-plane budget.
+- “Free” is not treated as unlimited or as an availability SLA. Cloudflare
+  Realtime TURN egress is billed separately from the application-plane budget.
 - The two apps do not share user data or DO namespaces merely because they
   share code.
 - A second cloud provider is not part of the first implementation.
@@ -154,15 +135,13 @@ flowchart LR
   end
 
   subgraph CF["Cloudflare edge — one deployment per app"]
-    EW["Edge Worker\nassets, auth, routing, TURN credentials"]
+    EW["Edge Worker\nassets, auth, routing, ICE servers"]
     UG["UserGatewayDO\none per opaque account"]
     SS["SignalScopeDO\none per active P2P scope"]
     APP["App DOs\nworkspace, matching, rooms, board"]
   end
 
-  subgraph VPS["VPS"]
-    TURN["coturn only\nUDP/TCP/TLS"]
-  end
+  TURN["Cloudflare Realtime TURN\nUDP/TCP/TLS"]
 
   UI --> GC
   GC <-->|"authenticated control WebSocket"| EW
@@ -170,7 +149,8 @@ flowchart LR
   UG <-->|"typed RPC"| APP
   RTC <-->|"opaque signaling only"| SS
   RTC <-->|"relay candidates when direct ICE fails"| TURN
-  UI -->|"short-lived TURN REST credentials"| EW
+  UI -->|"session: STUN + one-hour TURN credentials"| EW
+  EW -->|"mint credentials with the TURN key"| TURN
 ```
 
 ### Why deployments remain separate
@@ -191,7 +171,7 @@ packages/core/
   src/realtime/
     client.ts                 reconnect, resume, batching, backpressure
     protocol.ts               schemas, frame limits, version negotiation
-    transport.ts              durable-objects | legacy-relay selection
+    transport.ts              durable-objects transport
     limits.ts                 client-visible constants re-exported from limits.mjs
     types.ts
   worker/realtime/
@@ -215,9 +195,8 @@ shared primitives from `@peerly/core/worker/realtime` like any other consumer
 of the package — the wire protocol, crypto, auth, and `UserGatewayDO`/
 `SignalScopeDO` they call into remain single-implementation and shared.
 
-The browser-facing app code imports interfaces, not DO-specific classes. The
-legacy relay adapter and the DO adapter implement the same narrow application
-ports, but they do not share server implementations.
+The browser-facing app code imports interfaces (`CoordinationTransport`), not
+DO-specific classes.
 
 ## Authentication and session establishment
 
@@ -242,8 +221,11 @@ Use this flow:
    - Consult the user DO for revoked session/device epochs.
    - Set a 10-minute `Secure; HttpOnly; SameSite=Strict` cookie scoped to
      `/api/realtime`.
-   - Return current public runtime config and short-lived TURN REST
-     credentials. Never return the TURN shared secret.
+   - Return current public runtime config and `ice: { servers, ttlMs }`:
+     Cloudflare STUN plus Cloudflare Realtime TURN credentials valid for one
+     hour, renewed at every refresh. Never return the TURN key. Without a key,
+     or when Cloudflare fails or takes over 3 seconds, return STUN only and log
+     the failure.
 
 3. `GET /api/realtime/control` with `Upgrade: websocket`
    - Validate exact `Origin`, cookie MAC, audience, expiry, app, and protocol
@@ -276,7 +258,9 @@ Use independent secrets in each environment:
 ```text
 NETWORK_SESSION_SECRET
 OPAQUE_USER_ID_SECRET
-TURN_AUTH_SECRET
+RENDEZVOUS_SECRET
+TURN_KEY_ID                     # Cloudflare Realtime TURN key, via CodeFusion Console
+TURN_KEY_API_TOKEN
 GOOGLE_CLIENT_ID
 MICROSOFT_CLIENT_ID             # Peerly when enabled
 APPLE_CLIENT_ID                 # Peerly when enabled
@@ -396,9 +380,9 @@ authority immediately closes removed members' sockets. Duplicate message IDs
 are acknowledged without a second write or broadcast, and history is capped at
 1,000 events and 30 days.
 
-File bodies, file requests, and calls remain P2P and locally persisted. Setting
-both browser and Worker content backends to `p2p` restores the complete legacy
-content transport without silently mixing authorities.
+File bodies, file requests, and calls remain P2P and locally persisted. With
+both browser and Worker content backends set to `p2p`, as in production,
+messages and history travel peer to peer without silently mixing authorities.
 
 ### `InterestQueueDO` — HeyHubs only
 
@@ -564,8 +548,9 @@ offline -> enrolling -> session -> connecting -> ready
 - Surface `auth-required`, `rate-limited`, `service-unavailable`, and
   `client-upgrade-required` separately.
 - Preserve established WebRTC sessions if the control socket drops.
-- Do not start matching or publish directory state on the legacy backend while
-  a DO session is active.
+- Reopen a room's scope socket by itself after its Durable Object restarts
+  (for example on a deploy): after 1, 2, 5 and 10 seconds, then every 30
+  seconds, jittered so every client does not return at once.
 - Expose transport, reconnect count, last successful event, and degraded state
   in the existing diagnostics UI without exposing identifiers or tokens.
 
@@ -620,11 +605,12 @@ Reliability mechanisms:
 - Deterministic reservation order for matchmaking.
 - Exponential reconnect and resumption.
 - Established P2P sessions remain independent of the control plane.
-- Preview smoke tests before production and immediate rollback by one backend
-  configuration change.
-- A synthetic probe enrolls a test device, opens a control socket, performs a
-  scoped round trip, and verifies a TURN allocation without joining real user
-  scopes.
+- Preview smoke tests before production, and content rollback by one matched
+  browser/Worker configuration change.
+- A cron every five minutes (`MEDIA_HEALTH_CRON`) and the public, rate-limited
+  `GET /api/media/health` (`MEDIA_RATE_LIMITER`) check that the TURN key still
+  mints credentials; `npm run verify:production` calls the endpoint after
+  every production deploy.
 
 ## Observability and quota controls
 
@@ -646,7 +632,7 @@ Dashboards and alerts:
 - directory and board write/read counts;
 - estimated requests, GB-s, rows read/written, and stored bytes versus 50%,
   75%, and 90% of the Free allowance;
-- TURN credential requests and successful client allocation checks.
+- TURN credential minting failures and media health results.
 
 At 75%, increase batching/cache TTLs and reduce nonessential snapshot refresh.
 At 90%, reject board bulk synchronization and nonessential stats first while
@@ -686,9 +672,9 @@ For both apps:
 
 - enroll two independent device keys, connect, disconnect, and resume;
 - direct WebRTC succeeds with DO signaling;
-- forced TURN succeeds with short-lived credentials from the Worker;
+- the session's ICE grant holds only Cloudflare STUN/TURN URLs, and TURN is
+  dropped a minute before it expires;
 - a live P2P call/chat survives control-socket loss;
-- legacy backend works only when explicitly configured;
 - no credential appears in built JavaScript, local/session storage, URLs, or
   browser logs.
 
@@ -725,116 +711,28 @@ HeyHubs:
 Each phase is a separate, reviewable PR or small PR series. Do not mix a
 protocol migration with unrelated product work.
 
-### Phase 0 — freeze and baseline
+Done for Peerly:
 
-1. Add this decision and the HeyHubs execution checklist.
-2. Add a relay maintenance policy to contributor documentation and PR review.
-3. Capture current production request rates, connected clients, match starts,
-   room updates, board events, and TURN allocations for seven days.
-4. Record the current relay protocol as compatibility fixtures; no new relay
-   message types after this point.
-5. Confirm Cloudflare Free allowances, custom-domain routing, and preview
-   namespace configuration before implementation.
+- Shared protocol, enrollment/session routes, `UserGatewayDO` with
+  hibernation, revocation, deduplication and resume, with Worker-pool and
+  two-browser tests.
+- `SignalScopeDO` and the `durable-objects` signaling adapter for workspace and
+  DM scopes; data and media stay on WebRTC.
+- Invitations and DM rings through `UserGatewayDO` (`invite.send`,
+  `ring.send`); the encrypted content and lobby channels.
+- Production signals through Durable Objects, and TURN is Cloudflare Realtime
+  TURN minted per session by the Worker. The self-hosted relay and TURN server
+  are gone from the code and configuration.
 
-Exit: baseline report exists; relay scope is frozen; no current behavior is
-unowned by the migration matrix.
+Remaining for Peerly: production content through Durable Objects, step by step
+in [DURABLE_OBJECTS_CUTOVER.md](./DURABLE_OBJECTS_CUTOVER.md). Watch errors,
+latency, reconnection, TURN health and quota estimates continuously for the
+first hour and daily for seven days. Exit after seven days: no severity-1/2
+correctness or privacy incident, SLOs met, and projected daily usage below 75%
+of every Free allowance.
 
-### Phase 1 — shared protocol, auth, and gateway
-
-1. Add the shared protocol schemas, limits, DO client, and transport port to
-   `@peerly/core`.
-2. Implement enrollment/session endpoints and signed HttpOnly network cookie.
-3. Implement `UserGatewayDO` with hibernation, attachments, revocation,
-   deduplication, resume, and bounded mailbox.
-4. Add SQLite class migrations and all preview bindings to both repos.
-5. Add Worker-pool integration tests and two-browser connection/resume tests.
-6. Publish `@peerly/core`, then update HeyHubs through its normal core release
-   process.
-
-Exit: both preview apps hold a stable control socket and resume after forced
-hibernation/restart; no product operation uses it yet.
-
-### Phase 2 — DO signaling and TURN-only VPS path
-
-1. Implement `SignalScopeDO` and the `durable-objects` signaling adapter.
-2. Route Peerly workspace, Peerly/HeyHubs DM, HeyHubs random chat, and HeyHubs
-   public-room signaling through scoped DOs.
-3. Keep data/media on WebRTC and verify that scope loss cannot cross-connect
-   users.
-4. Issue TURN REST credentials from each app Worker using the coturn shared
-   secret and current authenticated device session.
-5. Run direct-ICE and forced-TURN browser matrices on Chromium, Firefox,
-   WebKit, and mobile viewports.
-
-Exit: every P2P scope establishes through DO signaling in preview; established
-sessions survive control-plane loss; VPS relay receives no preview traffic.
-
-### Phase 3 — Peerly coordination
-
-1. Move workspace presence and reconnect notices to `WorkspaceDO`.
-2. Move friend invitations, DM rings, and approved-device sync notifications
-   through `UserGatewayDO`.
-3. Preserve client-side signed workspace/member checks and all P2P content
-   paths.
-4. Remove the old relay coordinator from Peerly's default transport path.
-
-Exit: Peerly preview passes authorization, reconnect, notification, P2P
-survival, and quota projection tests.
-
-### Phase 4 — HeyHubs matching and discovery
-
-1. Implement `InterestQueueDO` and gateway reservations.
-2. Implement presence/stat shards and cached aggregate snapshots.
-3. Implement sharded, paginated room directory.
-4. Route DM rings and device-sync notices through the gateway.
-5. Keep existing P2P lobby behavior available only in the legacy adapter.
-
-Exit: matching is race-safe across multiple interests; room/presence state
-repairs after restarts; browser E2E and load/fault suites pass.
-
-### Phase 5 — immediate production cutover
-
-1. Deploy DO migrations and Workers without changing the selected backend.
-2. Run the production synthetic probe and authenticated manual smoke test.
-3. Set `COORDINATION_BACKEND=durable-objects` for Peerly and HeyHubs in the same
-   planned window; keep `LEGACY_RELAY_ENABLED=false`.
-4. Watch errors, latency, match success, reconnection, TURN allocation, and
-   quota estimates continuously for the first hour and daily for seven days.
-5. Roll back the whole app to `legacy-relay` only if a correctness/security
-   threshold fails. Never dual-write.
-
-Exit after seven days: no severity-1/2 correctness or privacy incident, SLOs
-met, and projected daily usage below 75% of every Free allowance.
-
-### Phase 6 — VPS relay shutdown
-
-1. Stop and disable the Node relay/coordinator services and remove them from
-   restart/deploy automation.
-2. Remove the HTTP/WebSocket relay proxy. Let coturn terminate TURN/TLS
-   directly; use DNS-based certificate renewal if needed.
-3. Keep coturn on the required UDP/TCP/TLS listeners, TURN REST shared secret,
-   external-IP mapping, allocation limits, and log rotation.
-4. Restrict the firewall to TURN listeners and necessary administration such
-   as SSH. No application HTTP/WebSocket port remains.
-5. Remove relay DNS records after their rollback TTL and monitoring window.
-6. Verify both production apps with forced TURN after the shutdown.
-7. Evaluate retiring the VPS entirely by moving relay candidates to
-   Cloudflare Realtime TURN (`turn.cloudflare.com`). It currently includes
-   1,000 GB/month free, then $0.05/GB, accepts client connections over UDP
-   3478/53, TCP 3478/80, and TLS 5349/443, and mints short-lived credentials
-   (48-hour maximum TTL) from a server-side API — the same Worker flow that
-   signs coturn REST credentials today, with anycast routing to the nearest
-   edge instead of one fixed data center. Adopt it only if the Phase 0
-   baseline projects monthly TURN egress comfortably below the free tier, and
-   verify the caveats first: relay addresses are IPv4-only, the relayed leg
-   is UDP-only (normal for WebRTC), per-client throughput is bounded at
-   roughly 50 Mbps, and the free tier is not contractual. Keep the coturn
-   configuration archived as the rollback path either way.
-
-Exit: coturn is the VPS's only application service and no app configuration
-references the relay host — or, if the Cloudflare TURN evaluation passes,
-forced-TURN tests pass against `turn.cloudflare.com` in both production apps
-and the VPS is decommissioned with its coturn configuration archived.
+HeyHubs matching and discovery (`InterestQueueDO`, presence/stat shards, the
+room directory) are tracked in the HeyHubs repository.
 
 ### Phase 7 — durable HeyHubs board, only after privacy approval
 
@@ -860,28 +758,11 @@ stays within budget, and policy/behavior match.
 - [ ] No private content or credential is logged or placed in a URL.
 - [ ] Match, directory, invitation, and board writes are idempotent and bounded.
 - [ ] Established P2P traffic survives control-plane interruption.
-- [ ] Forced-TURN tests pass against the active TURN backend.
-- [ ] TURN decision recorded: coturn VPS retained, or Cloudflare Realtime
-      TURN adopted with measured egress projected below its free tier.
+- [ ] Media health passes against Cloudflare Realtime TURN, and measured TURN
+      egress is projected below its free tier.
 - [ ] Peak-load projection plus 2x safety margin remains below 75% of Free
       allowances, or Workers Paid is approved before cutover.
 - [ ] Production uses only one backend and defaults to `durable-objects`.
-- [ ] Relay rollback is tested before its VPS service is disabled.
+- [ ] Content rollback to `p2p` is tested before the content cutover.
 - [ ] Privacy documentation is updated before any board content is stored.
-- [ ] Seven-day cutover exit criteria pass before relay DNS/service removal.
-
-## First implementation PR
-
-The first architecture implementation PR should be intentionally narrow:
-
-1. Add shared v1 protocol schemas and hard limits.
-2. Add enrollment/session routes.
-3. Add `UserGatewayDO` with a single `ping`/`resume` control capability.
-4. Add SQLite migrations and preview/prod bindings in both apps.
-5. Add Worker-pool hibernation, auth, replay, and reconnect tests.
-6. Add the production runtime backend selector, defaulting to
-   `durable-objects` only when the vertical slice includes real DO signaling.
-
-Do not change the legacy relay protocol in that PR. This proves the security,
-deployment, migration, hibernation, and client-resume foundation before
-matching or workspace behavior depends on it.
+- [ ] Seven-day cutover exit criteria pass.

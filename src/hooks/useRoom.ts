@@ -18,8 +18,8 @@ const PRIVATE_HANDSHAKE_TIMEOUT_MS = 12_000
 // the package can't know the password is a "workspace password" or that the
 // other peer is a "teammate".
 /**
- * A denied handshake is the trust model working, not a network problem — "check your network" (or "is the local relay
- * running?", which is how the ws-relay strategy reports every join error) would send the user debugging the wrong thing.
+ * A denied handshake is the trust model working, not a network problem — "check your network" would send the user
+ * debugging the wrong thing.
  */
 function identityDeniedText(raw: string): string | null {
   if (!raw.includes(IDENTITY_DENIED_PREFIX)) return null
@@ -45,10 +45,7 @@ const ERROR_TEXT = {
   'ice-failed': () =>
     'Found your teammate, but the connection was interrupted. Waiting for them to reconnect.',
   'needs-turn': () =>
-    'Found your teammate but could not open a direct connection — one of you is on a network that blocks peer-to-peer (strict NAT or firewall). A TURN server is needed; see VITE_TURN_URLS in the README.',
-  'relay-failed': (raw: string) =>
-    identityDeniedText(raw) ??
-    `Connection failed: ${raw}. Ensure the local relay is running (npm run dev:relay).`,
+    'Found your teammate, but your networks block a direct connection and this server has no relay to route around it. Try another network, such as mobile data.',
   'supabase-config': () =>
     'Supabase signaling is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
   generic: (raw: string) =>

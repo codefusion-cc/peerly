@@ -3,10 +3,10 @@
 The P2P room core of [Peerly](https://github.com/codefusion-cc/peerly) — join encrypted
 [Trystero](https://github.com/dmotz/trystero) rooms by high-entropy room codes,
 with device identity, signing primitives, and signaling-strategy selection.
-No application server by default: signaling (Nostr by default) is used only so
-browsers can find each other; everything after the handshake is direct WebRTC.
-An optional `durable-objects` strategy (below) instead uses a Cloudflare
-Worker + Durable Objects control plane for coordination — see "Signaling
+Signaling is used only so browsers can find each other; everything after the
+handshake is direct WebRTC. The default `durable-objects` strategy signals
+through the app's own Cloudflare Worker and Durable Objects; `nostr` and
+`supabase` exist for development servers without a Worker. See "Signaling
 strategies".
 
 Powers Peerly and any app that joins the same style of encrypted Trystero
@@ -18,8 +18,8 @@ rooms. MIT.
 npm install @peerly/core
 ```
 
-`@trystero-p2p/supabase`, `@trystero-p2p/ws-relay`, and `react` are optional
-peer dependencies — install the ones your app actually uses. All signaling
+`@trystero-p2p/supabase` and `react` are optional peer dependencies; install
+the ones your app actually uses. All signaling
 strategies are imported dynamically, so your bundle only carries the transport
 you select.
 
@@ -28,7 +28,7 @@ you select.
 A **room code** is a 128-bit random hex string that doubles as the room's
 Trystero password: whoever holds the code can address the room *and* decrypt
 its WebRTC handshake, and nobody else can. Sharing the code is granting access;
-there is nothing to configure server-side because there is no server.
+there is no room membership to configure server-side.
 
 ```ts
 import { generateRoomCode, joinRoomByCode, resolveSignalingStrategy } from '@peerly/core'
@@ -127,29 +127,32 @@ fails after SDP exchange (strict NAT / flaky path).
 
 | Strategy | When | Config |
 |----------|------|--------|
-| `nostr` (default) | No server, public relays | none — curated `DEFAULT_NOSTR_RELAYS`, override `VITE_NOSTR_RELAYS` |
-| `ws-relay` | Offline / CI / local relay | `VITE_SIGNALING=ws-relay`, `resolveRelayUrls(env)` |
-| `supabase` | A relay you control | `VITE_SIGNALING=supabase` + `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` |
-| `durable-objects` | Cloudflare Worker + Durable Objects control plane | `VITE_SIGNALING=durable-objects` + `VITE_APP_ID`; the *Worker* must separately run with `COORDINATION_BACKEND=durable-objects`, matching DO bindings/migrations, and its own secrets — a client-only flag against an unconfigured Worker fails closed (`503`) rather than falling back |
+| `durable-objects` (default) | The app's Worker + Durable Objects control plane | `VITE_APP_ID`; the Worker needs the DO bindings, migrations and secrets. Against an unconfigured Worker the client fails closed (`503`) rather than falling back |
+| `nostr` | Development without a Worker, public relays | `VITE_SIGNALING=nostr`; curated `DEFAULT_NOSTR_RELAYS`, override `VITE_NOSTR_RELAYS` |
+| `supabase` | Development against a Supabase project | `VITE_SIGNALING=supabase` + `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` |
 
-Related helpers: `signalingLabel()`, `buildRelayUrls()`, `getNostrRelayConfig()`,
-`getSupabaseRoomConfig()`, `resolveRelayPort()`.
+Related helpers: `signalingLabel()`, `getNostrRelayConfig()`,
+`getSupabaseRoomConfig()`.
 
-`durable-objects` also replaces `/api/network/credentials` with
-`/api/network/session` for TURN credentials, and replaces the relay's own
-transport for presence/directory/DM notifications and WebRTC signaling
-(`SignalScopeDO`) — see [`worker/realtime`](worker/realtime) and
+`durable-objects` carries presence, directory and DM notifications and WebRTC
+signaling (`SignalScopeDO`); see [`worker/realtime`](worker/realtime),
 [`src/realtime`](src/realtime), and the
-[Durable Objects architecture doc](https://github.com/codefusion-cc/peerly/blob/main/docs/DURABLE_OBJECTS_ARCHITECTURE.md)
-for the full design. It currently backs only Peerly's stable preview
-deployment (`preview.peerly.cc`); production still runs the relay-based
-strategies above.
+[Durable Objects architecture doc](https://github.com/codefusion-cc/peerly/blob/main/docs/DURABLE_OBJECTS_ARCHITECTURE.md).
+When a Durable Object restarts, for example on a deploy, a room's scope socket
+reopens by itself after 1, 2, 5 and 10 seconds, then every 30 seconds, with
+jitter; connected peers keep talking directly meanwhile.
 
-TURN for strict NATs uses `VITE_TURN_URLS` plus short-lived credentials from
-`/api/network/credentials` (see `resolveIceServers`). Do not embed long-lived
-TURN credentials in `VITE_*` variables.
+ICE servers come only from the control session (`/api/network/session`), whose
+`ice: { servers, ttlMs }` the Worker fills with Cloudflare STUN and, when it
+has a TURN key, Cloudflare Realtime TURN credentials. `parseIceGrant` checks the
+servers with `parseIceServers` from `@codefusion-cc/realtime-media/ice` (only
+Cloudflare's STUN and TURN URLs) and turns `ttlMs` into an expiry on this
+device's clock. `usableIceServers` drops TURN a minute before that expiry, a
+refresh without TURN keeps credentials still held until then, and
+`currentIceServers(app)` gives peers created later the credentials of the
+latest session refresh. Without a grant, peers use Cloudflare STUN.
 
-### Relay diagnostics
+### Nostr relay diagnostics
 
 ```ts
 import { probeNostrRelay, probeNostrRelays, createRelayHealth } from '@peerly/core'
