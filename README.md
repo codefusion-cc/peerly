@@ -111,7 +111,7 @@ in `.env`, then restart the dev server.
 3. Configure the OAuth consent screen (External is fine; while in *Testing* only listed test users can sign in).
 4. Copy the client ID → `VITE_GOOGLE_CLIENT_ID`.
 
-The token's nonce names the device key (`<deviceKeyId>.<random>`), and every use of it comes with a signature by that key, so peers and the Worker accept it for 30 days after Google issued it (`src/auth/deviceToken.ts`), not just Google's hour. A page load with a Google token over three days old, or one under a key Google withdrew, asks Google again without a prompt, at most once a day; while the person stays signed in to Google they never see a sign-in again. Otherwise the workspace banner offers one before the 30 days end.
+The token's nonce names the device key (`<deviceKeyId>.<random>`), and every use of it comes with a signature by that key, so peers and the Worker accept it for 30 days after Google issued it (`src/auth/deviceToken.ts`), not just Google's hour. A page load with a Google token over three days old asks Google again without a prompt, at most once a day; while the person stays signed in to Google they never see a sign-in again. An open tab also checks its own token as peers do (when it opens, when the person comes back, every six hours): one under a key Google withdrew reads as ended, and the next load refreshes it. Otherwise the workspace banner offers a sign-in before the 30 days end; during a call or a file transfer it first says what leaving would end.
 
 ### Microsoft
 
