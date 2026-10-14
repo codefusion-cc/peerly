@@ -190,11 +190,11 @@ cd /Users/xeon/Projects/Peerly && codefusion-console cloudflare workers:edit,dom
 
 `codefusion-console cloudflare <scope>[,<scope>…] [--ttl 30m] -- <command>` mints a token with exactly those scopes for that one command (two hours by default), hands it over as `CLOUDFLARE_API_TOKEN` with `CLOUDFLARE_ACCOUNT_ID`, and deletes it when the command exits; a token with an `:edit` scope waits for the owner's passkey tap on Dispatch. The preview deploy needs `workers:edit` and `domains:edit` (its `preview.peerly.cc` custom domain); its secrets (`codefusion-console cloudflare workers:edit -- npx wrangler secret put <NAME> -c wrangler.preview.jsonc`) need `workers:edit`. Once per Mac: `npm install -g @codefusion-cc/console && codefusion-console relay install`.
 
-Peerly and HeyHubs each deploy their own Worker and Durable Object namespaces from the shared code in `packages/core/worker/realtime` and [`packages/core/src/realtime`](packages/core/src/realtime), with independent secrets and data. [docs/DURABLE_OBJECTS_ARCHITECTURE.md](docs/DURABLE_OBJECTS_ARCHITECTURE.md) has the full design.
+Peerly's Worker and Durable Objects come from `packages/core/worker/realtime` and [`packages/core/src/realtime`](packages/core/src/realtime). That core is being replaced step by step by the shared `@codefusion-cc/realtime` packages HeyHubs already runs. [docs/DURABLE_OBJECTS_ARCHITECTURE.md](docs/DURABLE_OBJECTS_ARCHITECTURE.md) has the current design.
 
 `npm run test:e2e` and `npm run test:e2e:do` drive it the way a user would: each builds the app, serves the build from the real Worker on localhost with real Durable Objects, and runs browser contexts against it, with peer-to-peer content and Durable Objects content respectively. Test-only sign-in there is configuration: a generic `oidc` provider whose JWKS is served from the build, set only in [`wrangler.e2e.jsonc`](wrangler.e2e.jsonc). A deployment that sets none of those variables resolves the provider to `null` and the route answers `503`, so it cannot be switched on by accident.
 
-[docs/REWRITE_ARCHITECTURE.md](docs/REWRITE_ARCHITECTURE.md) records how this was built and what remains; [docs/DURABLE_OBJECTS_CUTOVER.md](docs/DURABLE_OBJECTS_CUTOVER.md) covers rollout and rollback.
+[docs/REWRITE_ARCHITECTURE.md](docs/REWRITE_ARCHITECTURE.md) records how this was built and the invariants it must keep; [docs/DURABLE_OBJECTS_CUTOVER.md](docs/DURABLE_OBJECTS_CUTOVER.md) covers rollout and rollback.
 
 ### TURN
 

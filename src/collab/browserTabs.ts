@@ -109,7 +109,7 @@ export class BrowserTabs {
     this.hiddenClaimDelayMs = options.hiddenClaimDelayMs ?? HIDDEN_CLAIM_DELAY_MS
     if (this.channel) this.channel.onmessage = event => this.receive(event.data)
     if (this.locks) {
-      void this.locks.request(`${LIFE_LOCK_PREFIX}${this.tabId}`, {}, () =>
+      void unheldRequest(this.locks).call(this.locks, `${LIFE_LOCK_PREFIX}${this.tabId}`, {}, () =>
         new Promise<void>(resolve => { this.releaseLife = resolve })
       ).catch(() => {})
     }
@@ -250,6 +250,16 @@ function defaultChannel(): ChannelLike | null {
   } catch {
     return null
   }
+}
+
+/**
+ * The browser's own `request`. src/updates.ts holds a reload into a newer build while a lock request runs, by
+ * wrapping `request` on the `navigator.locks` instance; the life lock runs as long as the tab, so it takes the method
+ * from the prototype and never holds the reload. Claims go through the wrapped one: a reload waits for them.
+ */
+function unheldRequest(locks: LocksLike): LocksLike['request'] {
+  const own = (Object.getPrototypeOf(locks) as Partial<LocksLike> | null)?.request
+  return typeof own === 'function' ? own : locks.request
 }
 
 function defaultLocks(): LocksLike | null {

@@ -6,9 +6,15 @@ content channel). Every Peerly build signals through Durable Objects.
 Production (`peerly.cc`) keeps message content peer to peer
 (`CONTENT_BACKEND=p2p`); preview (`preview.peerly.cc`) keeps it in Durable
 Objects. File bodies and call media are peer to peer everywhere, and TURN is
-Cloudflare Realtime TURN. HeyHubs' rollout status lives in its own repo.
+Cloudflare Realtime TURN.
 Date: 2026-07-29
-Applies to: Peerly and `@peerly/core`; other apps consume the generic core primitives through their own adapters
+Applies to: Peerly and `@peerly/core`
+
+Being retired (2026-10): HeyHubs no longer uses `@peerly/core`; it runs on
+`@codefusion-cc/realtime` and `@codefusion-cc/realtime-media`, which grew from
+this core. Peerly moves onto the same packages one step at a time, keeping its
+Durable Object class names and existing sessions, and `packages/core` goes once
+the last step is in production. Until then this document describes what runs.
 
 This document decides what to build and why; the code in `packages/core`
 is the reference for exact wire formats and storage.
@@ -122,13 +128,14 @@ quota exhaustion causes undefined user-facing behavior.
 
 ## High-level architecture
 
-Each app deploys its own Worker and DO namespaces. The implementations are
-shared through `@peerly/core`, but Peerly and HeyHubs have separate data,
-secrets, migrations, dashboards, and failure domains.
+Peerly deploys its own Worker and DO namespaces from `@peerly/core`, with its
+own data, secrets, migrations, dashboards, and failure domain. The HeyHubs
+sections below record the original shared design; HeyHubs now runs its own
+copy on `@codefusion-cc/realtime`.
 
 ```mermaid
 flowchart LR
-  subgraph Browser["Peerly or HeyHubs browser"]
+  subgraph Browser["Peerly browser"]
     UI["Application UI"]
     GC["Control client\n(one hibernatable WS)"]
     RTC["WebRTC data/media"]

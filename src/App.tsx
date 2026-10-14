@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { configureRuntimeAuthCredentialProvider } from '@peerly/core'
 import { DeviceIdentity } from './collab/deviceIdentity'
 import { loadStoredProfile, saveStoredProfile } from './collab/profileStore'
@@ -43,12 +43,14 @@ import type { IncomingWorkspaceInvite } from './collab/workspaceInviteStore'
 import { resolveAvatarPreview } from './collab/avatarService'
 import { AppVersionBadge } from './components/AppVersionBadge'
 import { browserTabs } from './collab/browserTabs'
+import { UpdateNotice } from './components/UpdateNotice'
+import { lazyPage, updates } from './updates'
 
-const MyDevicesPage = lazy(() => import('./components/MyDevicesPage').then(module => ({ default: module.MyDevicesPage })))
-const SyncActivityPage = lazy(() => import('./components/SyncActivityPage').then(module => ({ default: module.SyncActivityPage })))
-const LegalPage = lazy(() => import('./legal/LegalPage').then(module => ({ default: module.LegalPage })))
-const Workspace = lazy(() => import('./components/Workspace').then(module => ({ default: module.Workspace })))
-const AccountPreferencesPage = lazy(() => import('./components/AccountPreferencesPage').then(module => ({ default: module.AccountPreferencesPage })))
+const MyDevicesPage = lazyPage(() => import('./components/MyDevicesPage').then(module => module.MyDevicesPage))
+const SyncActivityPage = lazyPage(() => import('./components/SyncActivityPage').then(module => module.SyncActivityPage))
+const LegalPage = lazyPage(() => import('./legal/LegalPage').then(module => module.LegalPage))
+const Workspace = lazyPage(() => import('./components/Workspace').then(module => module.Workspace))
+const AccountPreferencesPage = lazyPage(() => import('./components/AccountPreferencesPage').then(module => module.AccountPreferencesPage))
 
 const deviceIdentity = new DeviceIdentity()
 
@@ -65,6 +67,8 @@ function AppContent() {
   const signedIn = Boolean(loadSignedInIdentity()) || hasRememberedIdentity
   const { route, navigate, pickerTab, workspaceRoute, enterWorkspace, leaveToPicker, setPickerTab, setWorkspaceRoute } =
     useAppRouting(session?.workspaceRouteId, signedIn, ready)
+  // Fields changed on the last screen no longer hold a reload into a newer build.
+  useEffect(() => updates.navigated(), [route, workspaceRoute])
   const [legalAccepted, setLegalAccepted] = useState(() => hasAcceptedCurrentLegal())
   const acceptLegal = () => {
     acceptCurrentLegal()
@@ -487,6 +491,7 @@ function App() {
   return (
     <>
       <AppContent />
+      <UpdateNotice />
       <AppVersionBadge />
     </>
   )

@@ -66,6 +66,7 @@
     "prebuild:preview": "npm run build:core"
   },
   "dependencies": {
+    "@codefusion-cc/app-update": "^0.1.2",
     "@codefusion-cc/console": "^0.32.0",
     "@codefusion-cc/realtime-media": "^0.1.5",
     "@tensorflow/tfjs": "^4.22.0",

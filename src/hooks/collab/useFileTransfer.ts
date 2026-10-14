@@ -23,6 +23,7 @@ import { isProbablyNsfwMedia } from '../../collab/nsfwGate'
 import { estimateBrowserStorageCached, hasRoomForWrite, storagePressure } from '../../utils/browserStorage'
 import { isInlineImageType, isInlineVideoType } from '../../utils/fileType'
 import { loadFileSyncMode } from '../../collab/syncPreferences'
+import { useTransferHold } from '../../updates'
 
 type FileAction = {
   send: (
@@ -61,6 +62,7 @@ export function useFileTransfer(
   onFileNsfw?: (fileId: string, nsfw: boolean) => void
 ) {
   const [transfers, setTransfers] = useState<FileTransfer[]>([])
+  useTransferHold(transfers)
   const [fileError, setFileError] = useState<string | null>(null)
   const fileActionRef = useRef<FileAction | null>(null)
   const fileRequestActionRef = useRef<FileRequestAction | null>(null)
