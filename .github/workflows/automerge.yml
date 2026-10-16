@@ -50,7 +50,10 @@ jobs:
           repository: codefusion-cc/codefusion
           token: ${{ steps.source.outputs.token }}
           path: codefusion
-          sparse-checkout: automerge
+          # tools/automerge: where the action's code moves with the monorepo; automerge/ then forwards to it.
+          sparse-checkout: |
+            automerge
+            tools/automerge
           persist-credentials: false
       - id: token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
