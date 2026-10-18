@@ -10,6 +10,7 @@ allowBuilds:
 
 engineStrict: true
 
+# Our own package, newer than pnpm's minimum release age when it was taken.
 minimumReleaseAgeExclude:
   - '@codefusion-cc/console@0.34.0'
 
