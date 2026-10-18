@@ -9,3 +9,6 @@ allowBuilds:
   core-js: false
 
 engineStrict: true
+
+minimumReleaseAgeExclude:
+  - '@codefusion-cc/console@0.34.0'

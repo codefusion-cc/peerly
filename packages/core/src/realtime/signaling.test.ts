@@ -420,7 +420,7 @@ describe('a room whose scope restarts', () => {
 
   it('stops for good when the room is left while a reopening waits on the control plane', async () => {
     const room = await join(routedConfig)
-    let failConnect = (_: Error) => {}
+    let failConnect: (reason: Error) => void = () => {}
     transport.connect.mockImplementation(() => new Promise((_, reject) => { failConnect = reject }))
     sockets[0].drop()
     await vi.advanceTimersByTimeAsync(1_000)
