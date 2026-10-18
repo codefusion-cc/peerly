@@ -1,13 +1,13 @@
-import { createIdentityRoutes } from '../packages/core/worker/identity.mjs'
+import { createIdentityRoutes } from '@peerly/core/worker/identity'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   clearOidcJwksCache,
   resolveOidcProvider,
   verifyOidcToken,
-} from '../packages/core/worker/oidc.mjs'
-import { lookupRendezvous } from '../packages/core/worker/rendezvous.mjs'
-import { issueLobbyIdentity, verifyLobbyIdentity } from '../packages/core/worker/lobbyIdentity.mjs'
-import { DEVICE_TOKEN_MAX_AGE_MS, deviceSignInNonce } from '../src/auth/deviceToken.ts'
+} from '@peerly/core/worker/oidc'
+import { lookupRendezvous } from '@peerly/core/worker/rendezvous'
+import { issueLobbyIdentity, verifyLobbyIdentity } from '@peerly/core/worker/lobby-identity'
+import { DEVICE_TOKEN_MAX_AGE_MS, deviceSignInNonce } from '@peerly/core/device-token'
 import { deriveUserId } from '../src/collab/userId.ts'
 
 const b64url = bytes => Buffer.from(bytes).toString('base64url')

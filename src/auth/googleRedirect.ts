@@ -7,7 +7,7 @@
  * Worker. `takeGoogleReturn` puts the address back before the app reads it, and `finishGoogleReturn` checks the
  * token and stores it before the first render.
  *
- * A redirect cannot renew a token without leaving the page, so a token lives 30 days (auth/deviceToken). Google
+ * A redirect cannot renew a token without leaving the page, so a token lives 30 days (@peerly/core/device-token). Google
  * withdraws its signing keys after a week or two, though, and a token under a withdrawn key cannot be checked by
  * anyone. So a page load with a Google token over `REFRESH_AFTER_MS` old, or under a key Google no longer
  * publishes, asks Google again without a prompt (`prompt=none`), at most once a day per browser.
@@ -18,7 +18,7 @@ import {
   takeGoogleSignInResult,
   type GoogleSignInResult,
 } from '@codefusion-cc/google-sign-in/browser'
-import { deviceSignInNonce } from './deviceToken'
+import { deviceSignInNonce } from '@peerly/core/device-token'
 import { getIdentityProvider, verifyProviderToken } from '../collab/identityProviders'
 
 /** Why a sign-in leaves for Google: the login screen, the banner renewing it, or a quiet refresh at load. */

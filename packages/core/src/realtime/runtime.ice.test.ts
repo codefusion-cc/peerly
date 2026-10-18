@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-// Trystero's own peer factory, by path: it is what turns a room's rtcConfig
-// into an RTCPeerConnection, and is not exported.
-import createTrysteroPeer from '../../../../node_modules/@trystero-p2p/core/dist/peer.mjs'
 import { joinRoomByCode } from '../joinRoom'
 import { CLOUDFLARE_STUN } from '@codefusion-cc/realtime-media/ice'
 import { ICE_EXPIRY_MARGIN_MS } from './ice'
 import { closeDurableObjectsTransport, currentIceServers, durableObjectsTurnAvailable } from './runtime'
+
+// Trystero's own peer factory, next to its entry point: it is what turns a
+// room's rtcConfig into an RTCPeerConnection, and is not exported.
+const { default: createTrysteroPeer } = await import(new URL('./peer.mjs', import.meta.resolve('@trystero-p2p/core')).href)
 
 /**
  * What the control session's ICE grants do to the peer connections of a room.

@@ -1,6 +1,6 @@
 import { resolveOidcProvider, verifyDevicePayload, verifyOidcToken } from './oidc.mjs'
 import { deriveUserId } from '@codefusion-cc/realtime/browser'
-import { deviceTokenAcceptedUntil } from '../../../src/auth/deviceToken.ts'
+import { deviceTokenAcceptedUntil } from '../dist/auth/deviceToken.js'
 
 const TTL_MS = 5 * 60_000
 const headers = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }

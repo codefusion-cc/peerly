@@ -1,4 +1,4 @@
-import { deviceSignInNonce } from '../auth/deviceToken'
+import { deviceSignInNonce } from '@peerly/core/device-token'
 import { describe, expect, it } from 'vitest'
 import type { DataPayload } from '@trystero-p2p/core'
 import type { KvStore } from '../utils/kvStore'

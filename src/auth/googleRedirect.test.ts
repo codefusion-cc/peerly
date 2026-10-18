@@ -2,7 +2,7 @@ import { testGoogleIssuer, type TestGoogleIssuer } from '@codefusion-cc/google-s
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import worker from '../../worker/index.mjs'
 import { readWranglerConfig } from '../../worker/testing/wranglerConfig.mjs'
-import { deviceSignInNonce } from './deviceToken'
+import { deviceSignInNonce } from '@peerly/core/device-token'
 
 // Google sign-in end to end, as far as one process can take it: the page's real redirect code, the package's fake
 // Google (its account chooser and keys), and Peerly's real Worker for the callback. Only the page's edges are made

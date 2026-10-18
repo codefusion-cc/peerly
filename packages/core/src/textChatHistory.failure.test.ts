@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest'
-import { createTextChatHistoryStore } from '@peerly/core'
+import { createTextChatHistoryStore } from './index'
 it('failed history writes report failure, remain readable, and can be retried', () => {
   const store = createTextChatHistoryStore({ storagePrefix: 'review-' })
   const wire = { id: 'message', ts: Date.now(), text: 'unsaved received message', name: 'Friend', deviceKeyId: 'device', sig: 'signature' }

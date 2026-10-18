@@ -1,3 +1,6 @@
+packages:
+  - packages/*
+
 # Install scripts run only for these; any other dependency with one fails the install until it is named here.
 allowBuilds:
   esbuild: true

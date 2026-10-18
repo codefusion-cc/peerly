@@ -19,7 +19,7 @@ type Props = {
 
 /**
  * The end of a sign-in, made visible. A token is accepted for 30 days
- * (auth/deviceToken); past that every NEW handshake fails (joining teammates, reconnects, your own other
+ * (@peerly/core/device-token); past that every NEW handshake fails (joining teammates, reconnects, your own other
  * devices) while existing connections keep working — which used to read as
  * "the app randomly broke". Existing state is untouched by re-auth: only the
  * stored token and the manager's copy are replaced.

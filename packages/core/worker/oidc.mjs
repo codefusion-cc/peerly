@@ -1,5 +1,5 @@
 import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, remoteKeys } from '@codefusion-cc/google-sign-in'
-import { nonceBindsDevice, verifyDeviceIdToken } from '../../../src/auth/deviceToken.ts'
+import { nonceBindsDevice, verifyDeviceIdToken } from '../dist/auth/deviceToken.js'
 
 const MAX_TOKEN_BYTES = 16_000
 const MAX_REQUEST_AGE_MS = 60_000

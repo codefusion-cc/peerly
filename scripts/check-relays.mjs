@@ -23,9 +23,9 @@ import { createEvent } from '@trystero-p2p/nostr'
  * should stay runnable with plain node.
  */
 function defaultRelays() {
-  const source = readFileSync(new URL('../packages/core/src/relays.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('src/relays.ts', import.meta.resolve('@peerly/core/package.json')), 'utf8')
   const block = /export const DEFAULT_NOSTR_RELAYS = \[([\s\S]*?)\]/.exec(source)
-  if (!block) throw new Error('Could not find DEFAULT_NOSTR_RELAYS in packages/core/src/relays.ts')
+  if (!block) throw new Error('Could not find DEFAULT_NOSTR_RELAYS in @peerly/core src/relays.ts')
   return [...block[1].matchAll(/'([^']+)'/g)].map(m => m[1])
 }
 

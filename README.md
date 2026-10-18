@@ -2,7 +2,7 @@
 
 Encrypted hybrid team collaboration. Every deployment signals through a Cloudflare Worker with Durable Objects. Production (`peerly.cc`) keeps messages peer to peer; `preview.peerly.cc` also keeps encrypted channel state and recent chat history in Durable Objects. File bodies and video calls use WebRTC in both. Built with [React](https://react.dev/), [Vite](https://vite.dev/), [Tailwind CSS](https://tailwindcss.com/) + [DaisyUI](https://daisyui.com/), [Cloudflare Workers](https://workers.cloudflare.com/), and [Trystero](https://github.com/dmotz/trystero). See the [cutover runbook](docs/DURABLE_OBJECTS_CUTOVER.md) for rollout and rollback.
 
-Highlights: the reusable P2P and Durable Objects primitives ship as the npm package [`@peerly/core`](packages/core), while Peerly owns its product-specific authorization and event policies. The app also includes messenger attention, signed message actions, rich file/call workflows, channel management, an installable offline shell, URL routing, complete English/Polish UI, and accessibility hardening. The running app always shows its exact version and commit in the UI.
+Highlights: the reusable P2P and Durable Objects primitives live in the workspace package [`@peerly/core`](packages/core), while Peerly owns its product-specific authorization and event policies. The app also includes messenger attention, signed message actions, rich file/call workflows, channel management, an installable offline shell, URL routing, complete English/Polish UI, and accessibility hardening. The running app always shows its exact version and commit in the UI.
 
 **Live app:** [peerly.cc](https://peerly.cc)
 
@@ -111,7 +111,7 @@ in `.env`, then restart the dev server.
 3. Configure the OAuth consent screen (External is fine; while in *Testing* only listed test users can sign in).
 4. Copy the client ID → `VITE_GOOGLE_CLIENT_ID`.
 
-The token's nonce names the device key (`<deviceKeyId>.<random>`), and every use of it comes with a signature by that key, so peers and the Worker accept it for 30 days after Google issued it (`src/auth/deviceToken.ts`), not just Google's hour. A page load with a Google token over three days old asks Google again without a prompt, at most once a day; while the person stays signed in to Google they never see a sign-in again. An open tab also checks its own token as peers do (when it opens, when the person comes back, every six hours): one under a key Google withdrew reads as ended, and the next load refreshes it. Otherwise the workspace banner offers a sign-in before the 30 days end; during a call or a file transfer it first says what leaving would end.
+The token's nonce names the device key (`<deviceKeyId>.<random>`), and every use of it comes with a signature by that key, so peers and the Worker accept it for 30 days after Google issued it (`@peerly/core/device-token`), not just Google's hour. A page load with a Google token over three days old asks Google again without a prompt, at most once a day; while the person stays signed in to Google they never see a sign-in again. An open tab also checks its own token as peers do (when it opens, when the person comes back, every six hours): one under a key Google withdrew reads as ended, and the next load refreshes it. Otherwise the workspace banner offers a sign-in before the 30 days end; during a call or a file transfer it first says what leaving would end.
 
 ### Microsoft
 
@@ -278,8 +278,11 @@ The generic P2P room core — room-code generation, signaling strategy selection
 `joinRoomByCode`, the `useRoom` React hook, device identity, signing
 primitives, browser-side OIDC verification, room media, attention helpers, and
 shared avatar/IDB utilities — lives in [`packages/core`](packages/core)
-([`@peerly/core`](packages/core/README.md)). The app consumes it from source
-via a Vite/tsconfig alias. It is no longer published: its parts move to
+([`@peerly/core`](packages/core/README.md)), a pnpm workspace the app depends
+on (`workspace:*`) and imports only through its exports. Vite, Vitest and the
+type check take its source (the `@peerly/source` export condition,
+[`source-conditions.ts`](source-conditions.ts)); the Worker's bundle takes its
+`dist/`. It is no longer published: its parts move to
 `@codefusion-cc/*` packages one by one, and it goes once Peerly no longer uses
 Trystero. Workspace semantics — creator-signed allow-lists, peer handshakes,
 history sanitization — deliberately stay in the app.

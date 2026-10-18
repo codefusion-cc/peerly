@@ -1,6 +1,6 @@
 import { bytesBase64Url, PROOF_PURPOSES, textBase64Url } from '@codefusion-cc/realtime'
 import { openControlSocket, testDevice } from '@codefusion-cc/realtime/testing'
-import { deviceSignInNonce } from '../../src/auth/deviceToken.ts'
+import { deviceSignInNonce } from '@peerly/core/device-token'
 
 /**
  * Real accounts for Worker tests: an OIDC issuer with a keypair generated per

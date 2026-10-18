@@ -1,4 +1,4 @@
-import { DEVICE_TOKEN_MAX_AGE_MS } from './auth/deviceToken'
+import { DEVICE_TOKEN_MAX_AGE_MS } from '@peerly/core/device-token'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   clearIdCredentials,

@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers'
 import { describe, expect, it } from 'vitest'
-import { createContentHandlers, workspaceContentAuthorizeCommand } from '../../../../worker/realtime/commands/content.mjs'
-import { workspacePolicy } from '../../../../worker/realtime/commands/content.test-fixtures.mjs'
+import { createContentHandlers, workspaceContentAuthorizeCommand } from './commands/content.mjs'
+import { workspacePolicy } from './commands/content.test-fixtures.mjs'
 import { deriveMemberId } from '@codefusion-cc/realtime'
 
 const secret = 'authority-regression-test-secret'

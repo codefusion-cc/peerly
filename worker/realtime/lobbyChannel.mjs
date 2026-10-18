@@ -1,4 +1,4 @@
-import { defineEphemeralChannel } from '../../packages/core/worker/realtime/gateway/ephemeralChannel.mjs'
+import { defineEphemeralChannel } from '@peerly/core/worker/realtime/ephemeral-channel'
 
 /**
  * Peerly's public authenticated lobby policy.

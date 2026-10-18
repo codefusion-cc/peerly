@@ -1,4 +1,4 @@
-import { defineAuthorizedChannel } from '../../packages/core/worker/realtime/gateway/authorizedChannel.mjs'
+import { defineAuthorizedChannel } from '@peerly/core/worker/realtime/channel'
 
 /**
  * Peerly's policy over the reusable encrypted Durable Object channel.

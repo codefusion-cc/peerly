@@ -1,6 +1,6 @@
 import {
   assess, describe as describeBudget, shouldNotify,
-} from '../packages/core/dist/usageBudget.js'
+} from '@peerly/core/usage-budget'
 
 /**
  * A cron worker that reads the account's own Cloudflare analytics and shouts

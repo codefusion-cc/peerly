@@ -1,4 +1,4 @@
-import { deriveChannelCapability } from '../../../packages/core/dist/channelCapability.js'
+import { deriveChannelCapability } from '@peerly/core/channel-capability'
 
 export async function workspacePolicy({
   secret = crypto.randomUUID(),

@@ -181,6 +181,9 @@ importers:
       '@codefusion-cc/realtime-media':
         specifier: ^0.1.5
         version: 0.1.5(@codefusion-cc/console@0.32.0)(react@19.2.7)
+      '@peerly/core':
+        specifier: workspace:*
+        version: link:packages/core
       '@tensorflow/tfjs':
         specifier: ^4.22.0
         version: 4.22.0(seedrandom@3.0.5)
@@ -272,6 +275,55 @@ importers:
       wrangler:
         specifier: ^4.145.0
         version: 4.145.0(@types/node@24.13.3)
+
+  packages/core:
+    dependencies:
+      '@codefusion-cc/google-sign-in':
+        specifier: ^0.1.2
+        version: 0.1.2
+      '@codefusion-cc/realtime':
+        specifier: ^0.1.6
+        version: 0.1.6(react@19.2.7)
+      '@codefusion-cc/realtime-media':
+        specifier: ^0.1.5
+        version: 0.1.5(@codefusion-cc/console@0.32.0)(react@19.2.7)
+      '@trystero-p2p/core':
+        specifier: ^0.25.3
+        version: 0.25.3
+      '@trystero-p2p/nostr':
+        specifier: ^0.25.3
+        version: 0.25.3
+    devDependencies:
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@trystero-p2p/supabase':
+        specifier: ^0.25.3
+        version: 0.25.3
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.3
+      '@vitest/coverage-v8':
+        specifier: ^4.1.11
+        version: 4.1.11(vitest@4.1.11)
+      fast-check:
+        specifier: ^4.10.2
+        version: 4.10.2
+      jsdom:
+        specifier: ^29.1.1
+        version: 29.1.1
+      react:
+        specifier: ^19.2.7
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.7(react@19.2.7)
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@24.13.3)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0))
 
 packages:
 

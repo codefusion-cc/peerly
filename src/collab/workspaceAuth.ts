@@ -12,7 +12,7 @@ import {
   E2E_GOOGLE_CLIENT_ID,
 } from './e2eAuth'
 import { GOOGLE_ISSUERS, type IdTokenClaims } from '@codefusion-cc/google-sign-in'
-import { deviceSignInNonce } from '../auth/deviceToken'
+import { deviceSignInNonce } from '@peerly/core/device-token'
 import {
   getIdentityProvider,
   verifyProviderToken,
@@ -106,7 +106,7 @@ export class WorkspaceAuthManager {
     }
   }
 
-  /** Checks a token this device signed in with (bound to its key, see auth/deviceToken) and keeps it. */
+  /** Checks a token this device signed in with (bound to its key, see @peerly/core/device-token) and keeps it. */
   async verifyAndStoreIdToken(
     token: string,
     providerId: IdentityProviderId

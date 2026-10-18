@@ -1,5 +1,5 @@
 import type { DeviceKeyId } from './deviceIdentity'
-import { deviceSignInNonce } from '../auth/deviceToken'
+import { deviceSignInNonce } from '@peerly/core/device-token'
 import {
   getIdentityProvider,
   type IdentityProvider,
@@ -24,7 +24,7 @@ export async function signInWithProviderConfig(
   provider: IdentityProvider,
   deviceKeyId: DeviceKeyId
 ): Promise<string> {
-  // The token's nonce names this device (auth/deviceToken), as Google's does.
+  // The token's nonce names this device (@peerly/core/device-token), as Google's does.
   const nonce = deviceSignInNonce(deviceKeyId)
   switch (provider.id) {
     case 'google':

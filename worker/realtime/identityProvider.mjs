@@ -1,9 +1,9 @@
-import { resolveOidcProvider, verifyOidcToken } from '../../packages/core/worker/oidc.mjs'
+import { resolveOidcProvider, verifyOidcToken } from '@peerly/core/worker/oidc'
 
 /**
  * The ID token check `handleRealtimeRoute` runs on enroll: a token of a
  * provider this deployment configures, bound to the enrolling device by its
- * nonce and at most 30 days old (src/auth/deviceToken.ts). Null for a
+ * nonce and at most 30 days old (packages/core/src/auth/deviceToken.ts). Null for a
  * provider it does not offer.
  */
 export function identityProvider(providerId, env) {

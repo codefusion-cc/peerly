@@ -1,5 +1,5 @@
 import { test, expect, type Browser } from '@playwright/test'
-import { DEVICE_TOKEN_MAX_AGE_MS } from '../src/auth/deviceToken'
+import { DEVICE_TOKEN_MAX_AGE_MS } from '@peerly/core/device-token'
 import {
   joinWorkspace,
   createWorkspace,
@@ -316,7 +316,7 @@ test.describe('Peerly P2P collaboration', () => {
     await joinWorkspace(page, { name: 'Alice', email: 'alice@e2e.test' })
     await expect(page.getByTestId('reauth-banner')).toHaveCount(0)
 
-    // Rewrite the stored token's iat so its 30 days (src/auth/deviceToken.ts)
+    // Rewrite the stored token's iat so its 30 days (packages/core/src/auth/deviceToken.ts)
     // end in a minute — inside the warning window. The signature becomes
     // invalid, which is fine: banner display reads only iat; the fresh token
     // minted by re-auth is what handshakes would use.

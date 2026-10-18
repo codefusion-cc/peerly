@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { nonceBindsDevice, LEGACY_NONCE_UNTIL } from '../auth/deviceToken'
+import { nonceBindsDevice, LEGACY_NONCE_UNTIL } from '@peerly/core/device-token'
 import { resetIdentityProviderCache } from './identityProviders'
 import { signInWithProvider } from './providerSignIn'
 

@@ -3,12 +3,12 @@ import { GOOGLE_KEYS_PATH, handleGoogleSignIn } from '@codefusion-cc/google-sign
 import {
   createIdentityRoutes, gatewayFor, handleRealtimeRoute, prepareAuthenticatedRealtimeUpgrade, retryOnReset,
 } from '@codefusion-cc/realtime'
-import { lookupRendezvous } from '../packages/core/worker/rendezvous.mjs'
-import { issueLobbyIdentity, verifyLobbyIdentity } from '../packages/core/worker/lobbyIdentity.mjs'
+import { lookupRendezvous } from '@peerly/core/worker/rendezvous'
+import { issueLobbyIdentity, verifyLobbyIdentity } from '@peerly/core/worker/lobby-identity'
 import { identityProvider } from './realtime/identityProvider.mjs'
 import { withIceServers } from './realtime/ice.mjs'
 
-export { SignalScopeDO } from '../packages/core/worker/realtime/gateway/signalScope.mjs'
+export { SignalScopeDO } from '@peerly/core/worker/realtime/signal-scope'
 export { UserGatewayDO } from './realtime/gateway.mjs'
 export { ContentChannelDO } from './realtime/contentChannel.mjs'
 export { LobbyChannelDO } from './realtime/lobbyChannel.mjs'

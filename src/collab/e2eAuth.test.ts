@@ -4,7 +4,7 @@ import type { KvStore } from '../utils/kvStore'
 import { getE2eInvite, issueE2eGoogleToken, E2E_GOOGLE_CLIENT_ID, getE2eJwksFetcher } from './e2eAuth'
 import { DeviceIdentity } from './deviceIdentity'
 import { GOOGLE_ISSUERS } from '@codefusion-cc/google-sign-in'
-import { deviceSignInNonce, verifyDeviceIdToken } from '../auth/deviceToken'
+import { deviceSignInNonce, verifyDeviceIdToken } from '@peerly/core/device-token'
 import { providerKeys } from './identityProviders'
 
 function memoryStore(): KvStore<CryptoKeyPair> {
