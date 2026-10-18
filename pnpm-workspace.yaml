@@ -9,3 +9,12 @@ allowBuilds:
   core-js: false
 
 engineStrict: true
+
+# Our own package, newer than pnpm's minimum release age when it was taken.
+minimumReleaseAgeExclude:
+  - '@codefusion-cc/console@0.34.0'
+
+# Stryker's Vitest runner runs no test for any mutant on Vitest 5 unpatched. The same patch as
+# codefusion-cc/codefusion's patches/ (config/stryker), byte for byte.
+patchedDependencies:
+  '@stryker-mutator/vitest-runner@10.0.0': patches/@stryker-mutator__vitest-runner@10.0.0.patch
