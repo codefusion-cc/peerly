@@ -41,20 +41,20 @@ Per-screen behavior, routes, and major functions:
 
 ## Quick start
 
-Requires **Node 24.x and npm 11.x** — the majors that wrote the lockfile. Majors are what matter: different npm MAJOR releases can rewrite optional dependency records incompatibly, while patch releases do not. Exact-patch pins were tried and abandoned twice — they turn any tool-mirror gap into a failed install (Cloudflare's builder could not fetch one specific patch and every deploy failed).
+Requires **Node 24.x and pnpm 12.14.0** (the version `packageManager` in `package.json` names; `corepack enable` picks it up).
 
 ```bash
 nvm install 24
 nvm use 24
-npm --version            # must print 11.x
+pnpm --version           # must print 12.14.0
 git clone https://github.com/codefusion-cc/peerly.git
-cd Peerly
-npm ci
+cd peerly
+pnpm install --frozen-lockfile
 cp .env.example .env   # add at least one identity provider (see below)
-npm run dev
+pnpm run dev
 ```
 
-Open the printed URL in two browser tabs (or share an invite link). Peers connect in a few seconds over public Nostr signaling, because the Vite dev server has no Worker to signal through. `npm run stop` kills the common dev ports.
+Open the printed URL in two browser tabs (or share an invite link). Peers connect in a few seconds over public Nostr signaling, because the Vite dev server has no Worker to signal through. `pnpm run stop` kills the common dev ports.
 
 ### First-time flow
 
@@ -169,7 +169,7 @@ Files and call media remain P2P in both modes.
 | Mode | When | Config |
 |------|------|--------|
 | **Durable Objects** (default) | Every build served by the Worker, production and preview | None |
-| **Nostr** | `npm run dev`, which has no Worker | `VITE_SIGNALING=nostr`, optional `VITE_NOSTR_RELAYS` |
+| **Nostr** | `pnpm run dev`, which has no Worker | `VITE_SIGNALING=nostr`, optional `VITE_NOSTR_RELAYS` |
 | **Supabase** | Development against a Supabase project | `VITE_SIGNALING=supabase` + Supabase URL/key |
 
 `VITE_NOSTR_RELAYS` replaces the dev server's curated Nostr relays. Members need at least one relay in common, so relay choice is build-time configuration, not a user setting.
@@ -182,17 +182,17 @@ The Worker ([`worker/index.mjs`](worker/index.mjs)) handles device enrollment, s
 
 When a Durable Object restarts, for example on every deploy, an open room's scope socket reopens by itself after 1, 2, 5 and 10 seconds, then every 30 seconds, with jitter. Peers that are already connected keep talking directly meanwhile.
 
-`npm run deploy:preview` deploys `peerly-preview` through `wrangler.preview.jsonc`, whose build writes `dist-preview/`, so a preview deploy never touches production's `dist/`. It runs from the Mac through the CodeFusion Console CLI rather than `wrangler login`, whose token reaches the whole account:
+`pnpm run deploy:preview` deploys `peerly-preview` through `wrangler.preview.jsonc`, whose build writes `dist-preview/`, so a preview deploy never touches production's `dist/`. It runs from the Mac through the CodeFusion Console CLI rather than `wrangler login`, whose token reaches the whole account:
 
 ```bash
-cd /Users/xeon/Projects/Peerly && codefusion-console cloudflare workers:edit,domains:edit -- npm run deploy:preview
+cd /Users/xeon/Projects/Peerly && codefusion-console cloudflare workers:edit,domains:edit -- pnpm run deploy:preview
 ```
 
-`codefusion-console cloudflare <scope>[,<scope>…] [--ttl 30m] -- <command>` mints a token with exactly those scopes for that one command (two hours by default), hands it over as `CLOUDFLARE_API_TOKEN` with `CLOUDFLARE_ACCOUNT_ID`, and deletes it when the command exits; a token with an `:edit` scope waits for the owner's passkey tap on Dispatch. The preview deploy needs `workers:edit` and `domains:edit` (its `preview.peerly.cc` custom domain); its secrets (`codefusion-console cloudflare workers:edit -- npx wrangler secret put <NAME> -c wrangler.preview.jsonc`) need `workers:edit`. Once per Mac: `npm install -g @codefusion-cc/console && codefusion-console relay install`.
+`codefusion-console cloudflare <scope>[,<scope>…] [--ttl 30m] -- <command>` mints a token with exactly those scopes for that one command (two hours by default), hands it over as `CLOUDFLARE_API_TOKEN` with `CLOUDFLARE_ACCOUNT_ID`, and deletes it when the command exits; a token with an `:edit` scope waits for the owner's passkey tap on Dispatch. The preview deploy needs `workers:edit` and `domains:edit` (its `preview.peerly.cc` custom domain); its secrets (`codefusion-console cloudflare workers:edit -- pnpm exec wrangler secret put <NAME> -c wrangler.preview.jsonc`) need `workers:edit`. Once per Mac: `pnpm add -g @codefusion-cc/console && codefusion-console relay install`.
 
 Peerly's Worker runs its control plane on `@codefusion-cc/realtime`, the package HeyHubs also runs, with its own Durable Object namespaces, secrets and data. Peerly's page still talks to it through its older control client in [`packages/core/src/realtime`](packages/core/src/realtime), which goes step by step. [docs/DURABLE_OBJECTS_ARCHITECTURE.md](docs/DURABLE_OBJECTS_ARCHITECTURE.md) has the design.
 
-`npm run test:e2e` and `npm run test:e2e:do` drive it the way a user would: each builds the app, serves the build from the real Worker on localhost with real Durable Objects, and runs browser contexts against it, with peer-to-peer content and Durable Objects content respectively. Test-only sign-in there is configuration: a generic `oidc` provider whose JWKS is served from the build, set only in [`wrangler.e2e.jsonc`](wrangler.e2e.jsonc). A deployment that sets none of those variables resolves the provider to `null` and the route answers `503`, so it cannot be switched on by accident.
+`pnpm run test:e2e` and `pnpm run test:e2e:do` drive it the way a user would: each builds the app, serves the build from the real Worker on localhost with real Durable Objects, and runs browser contexts against it, with peer-to-peer content and Durable Objects content respectively. Test-only sign-in there is configuration: a generic `oidc` provider whose JWKS is served from the build, set only in [`wrangler.e2e.jsonc`](wrangler.e2e.jsonc). A deployment that sets none of those variables resolves the provider to `null` and the route answers `503`, so it cannot be switched on by accident.
 
 [docs/REWRITE_ARCHITECTURE.md](docs/REWRITE_ARCHITECTURE.md) records how this was built and the invariants it must keep; [docs/DURABLE_OBJECTS_CUTOVER.md](docs/DURABLE_OBJECTS_CUTOVER.md) covers rollout and rollback.
 
@@ -202,7 +202,7 @@ Calls use Cloudflare Realtime TURN through [`@codefusion-cc/realtime-media`](htt
 
 The browser accepts only Cloudflare's own STUN and TURN URLs, drops TURN a minute before it expires, and gives peers created later the renewed credentials.
 
-Two checks catch a key that stopped working: a cron every five minutes, and the public, rate-limited `GET /api/media/health`. `npm run verify:production` checks HSTS and that endpoint; CI runs it after every production deploy. Browser tests on one host connect over host candidates, so they never exercise TURN itself.
+Two checks catch a key that stopped working: a cron every five minutes, and the public, rate-limited `GET /api/media/health`. `pnpm run verify:production` checks HSTS and that endpoint; CI runs it after every production deploy. Browser tests on one host connect over host candidates, so they never exercise TURN itself.
 
 ## Deploy
 
@@ -211,7 +211,7 @@ authenticated `/api/network/*` and `/api/realtime/*` routes the client signals
 through.
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 Output goes to `dist/`. The build runs a bundle guard that fails if E2E test key material, a retired static credential, or a hostname of the retired self-hosted relay or TURN server reached the bundle.
@@ -223,9 +223,9 @@ The committed [`wrangler.jsonc`](wrangler.jsonc) deploys `dist/` with an SPA fal
 GitHub Actions deploys it: every push to `main` that passes the `test` job runs
 the `deploy` job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 (environment `production`, one deploy at a time, never cancelled). It runs
-`npm run build` with the Google client ID, the only build-time variable
-production needs, then `npx wrangler deploy`, waits until peerly.cc serves the
-new entry script, and runs `npm run verify:production`. Branches are not deployed; test them on
+`pnpm run build` with the Google client ID, the only build-time variable
+production needs, then `pnpm exec wrangler deploy`, waits until peerly.cc serves the
+new entry script, and runs `pnpm run verify:production`. Branches are not deployed; test them on
 preview.peerly.cc (below). The build shows `GITHUB_SHA` in the UI as
 `v<version> · <commit>`.
 
@@ -298,7 +298,7 @@ history sanitization — deliberately stay in the app.
 │   ├── check-relays.mjs    Nostr relay health diagnostic
 │   └── verify-production.mjs  HSTS and Cloudflare TURN health of a deployment
 ├── server/                 Dev and test servers, process helpers
-│   ├── dev.mjs             npm run dev (Nostr signaling)
+│   ├── dev.mjs             pnpm run dev (Nostr signaling)
 │   └── test-server.mjs     E2E: built app behind the real Worker + Durable Objects (p2p or durable-objects content)
 ├── src/
 │   ├── collab/             P2P protocol, crypto, identity, stores
@@ -312,7 +312,7 @@ history sanitization — deliberately stay in the app.
 │   └── session.ts          Active workspace session persistence
 ├── build-info.mjs          Version + commit injected at build time
 ├── .env.example            Environment template (copy to .env)
-├── .nvmrc                  Node 24.18.0 (npm 11.16.0 / CI alignment)
+├── .nvmrc                  Node 24
 ├── playwright.config.ts    Browser suite against production's shape (serial)
 ├── playwright.do.config.ts Durable Objects browser suite (own target, serial)
 ├── vite.config.ts
@@ -326,30 +326,30 @@ history sanitization — deliberately stay in the app.
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Vite + public Nostr signaling |
-| `npm run dev:app` | Vite only, using the signaling strategy from the environment |
-| `npm run stop` | Stop the common local Peerly development ports |
-| `npm run build` | Typecheck + production build + bundle guard |
-| `npm test` | Vitest unit/component tests (counts change with the suite — run `npm test` for the current total) |
-| `npm run test:watch` | Vitest in watch mode |
-| `npm run typecheck` | `tsc -b` across every project (the root config is solution-style, so `tsc -p` alone checks nothing) |
-| `npm run test:workers` | Durable Object behaviour against real workerd |
-| `npm run test:e2e` | Playwright E2E against the real Worker and Durable Objects, p2p content |
-| `npm run test:e2e:do` | The same with Durable Objects content |
-| `npm run test:e2e:ui` | Playwright interactive UI |
-| `npm run verify:production` | Check a deployment's HSTS and Cloudflare TURN health (`PRODUCTION_SITE_URL`, default peerly.cc) |
-| `npm run preview` | Preview the production build locally |
-| `npm run check:relays` | Health-check the default Nostr relays |
-| `npm run check:csp` | Verify production CSP, its inline-script negative control, and the offline shell |
-| `npm run guard:bundle` | Fail if test key material or retired hostnames reached `dist/` (runs in `build`) |
-| `npm run lint` | oxlint |
+| `pnpm run dev` | Vite + public Nostr signaling |
+| `pnpm run dev:app` | Vite only, using the signaling strategy from the environment |
+| `pnpm run stop` | Stop the common local Peerly development ports |
+| `pnpm run build` | Typecheck + production build + bundle guard |
+| `pnpm test` | Vitest unit/component tests (counts change with the suite — run `pnpm test` for the current total) |
+| `pnpm run test:watch` | Vitest in watch mode |
+| `pnpm run typecheck` | `tsc -b` across every project (the root config is solution-style, so `tsc -p` alone checks nothing) |
+| `pnpm run test:workers` | Durable Object behaviour against real workerd |
+| `pnpm run test:e2e` | Playwright E2E against the real Worker and Durable Objects, p2p content |
+| `pnpm run test:e2e:do` | The same with Durable Objects content |
+| `pnpm run test:e2e:ui` | Playwright interactive UI |
+| `pnpm run verify:production` | Check a deployment's HSTS and Cloudflare TURN health (`PRODUCTION_SITE_URL`, default peerly.cc) |
+| `pnpm run preview` | Preview the production build locally |
+| `pnpm run check:relays` | Health-check the default Nostr relays |
+| `pnpm run check:csp` | Verify production CSP, its inline-script negative control, and the offline shell |
+| `pnpm run guard:bundle` | Fail if test key material or retired hostnames reached `dist/` (runs in `build`) |
+| `pnpm run lint` | oxlint |
 
 The app shows its version and commit (`v<version> · <commit>`) on the join screen and
 in the sidebar footer. Hosts that expose a commit SHA
 (`CF_PAGES_COMMIT_SHA`, `GITHUB_SHA`, `VERCEL_GIT_COMMIT_SHA`, …) are picked up
 automatically; otherwise it falls back to local git.
 
-`check:relays` is a diagnostic, not part of `npm test` — a third-party relay
+`check:relays` is a diagnostic, not part of `pnpm test` — a third-party relay
 going down shouldn't fail your build. Run it after editing
 `DEFAULT_NOSTR_RELAYS`: a relay that merely opens a socket can still silently
 drop the ephemeral events Trystero signals with, which looks identical to
@@ -386,14 +386,14 @@ Hybrid storage and transport trade-offs:
 
 GitHub Actions on push/PR to `main` / `master` (see [.github/workflows/ci.yml](.github/workflows/ci.yml)):
 
-1. Install Node `24.18.0` with its bundled npm `11.16.0`, then verify both exact versions.
-2. Run a clean `npm ci` from the committed lockfile.
+1. Install Node 24 and the pnpm version `package.json` names.
+2. Run `pnpm install --frozen-lockfile` from the committed `pnpm-lock.yaml`.
 3. Run the production audit, lint, unit and Worker tests, and coverage.
 4. Run the TypeScript/Vite production build and bundle guard, then `worker:check`.
 5. Install Chromium, verify CSP plus the offline shell, and run both Playwright suites against the real Worker and Durable Objects.
-6. On `main`, after the mutation job, deploy production and run `npm run verify:production`.
+6. On `main`, after the mutation job, deploy production and run `pnpm run verify:production`.
 
-`package.json` `devEngines`, `.npmrc`, `.nvmrc`, and CI all enforce the same toolchain. A mismatched Node or npm exits before it can rewrite `package-lock.json`.
+`package.json` (`devEngines`, `packageManager`), `pnpm-workspace.yaml` (`engineStrict`), `.nvmrc` and CI all name the same toolchain. A mismatched Node exits before the install. Only the packages `allowBuilds` in `pnpm-workspace.yaml` names may run install scripts.
 
 ## Legal
 

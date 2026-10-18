@@ -76,7 +76,7 @@ describe('e2eAuth', () => {
     })
 
     // The guard that keeps the signing key out of production bundles. If this
-    // ever resolves, the key is reachable and `npm run guard:bundle` is the
+    // ever resolves, the key is reachable and `pnpm run guard:bundle` is the
     // only thing left standing between it and every deployment.
     it('refuses to reach the signing key', async () => {
       const identity = new DeviceIdentity(memoryStore())

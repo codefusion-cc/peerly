@@ -28,7 +28,7 @@ export function isE2eAuthBypass(): boolean {
  * private key and all — from the output entirely. Routing this through a
  * function call would leave the bundler unable to prove the branch dead, and a
  * real RSA key that mints tokens this app trusts would be published in the
- * bundle of every deployment. `npm run guard:bundle` enforces this.
+ * bundle of every deployment. `pnpm run guard:bundle` enforces this.
  */
 async function loadE2eKeys() {
   if (import.meta.env.VITE_E2E_AUTH_BYPASS !== 'true') {

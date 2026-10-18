@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
  * harness exercise the real verification path on both sides rather than a
  * stub.
  *
- * Deliberately not part of `npm run build`. A deployment must never serve
+ * Deliberately not part of `pnpm run build`. A deployment must never serve
  * this: a JWKS at the app's own origin, paired with VITE_OIDC_ISSUER pointing
  * at that origin, is an identity provider anyone can mint tokens for. The E2E
  * server calls this explicitly, after the build, for exactly one run.

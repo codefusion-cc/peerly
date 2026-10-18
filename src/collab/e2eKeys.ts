@@ -18,7 +18,7 @@ import E2E_JWKS from '../../e2e/fixtures/oidcJwks.json'
  * bundle. The guard in e2eAuth.ts is an inline `import.meta.env` comparison
  * precisely so the bundler folds it to a constant and drops this whole chunk;
  * a cross-module function call there would be opaque to tree-shaking and this
- * key would ship. `npm run guard:bundle` fails the build if it ever does.
+ * key would ship. `pnpm run guard:bundle` fails the build if it ever does.
  *
  * The keypair is fixed rather than generated because both peers in an E2E run
  * are separate browser contexts that must agree on the same issuer key.

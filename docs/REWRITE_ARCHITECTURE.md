@@ -120,7 +120,7 @@ So the harness is part of the foundation, not a follow-up:
   code branch that could ship enabled.
 - **TURN health** — the Worker's five-minute cron and the public
   `GET /api/media/health` ask Cloudflare for TURN credentials with the
-  deployed key; `npm run verify:production` calls the endpoint after every
+  deployed key; `pnpm run verify:production` calls the endpoint after every
   production deploy. Two browsers on one host connect over host candidates and
   never exercise TURN, so only this catches a revoked or missing key. It needs
   no browser, no signed-in session and no second user. `probeTurnCapability`
@@ -160,8 +160,8 @@ by effort.
 
 | | Work | Why it is first |
 | --- | --- | --- |
-| A1 | ✅ HeyHubs browser harness (`npm run test:integration:do`) | This app's half of the control plane — the interest queue, the room directory, presence stats — had never run in a browser, and Peerly deploys most of it inert. Standing it up found the provider id hardcoded to `'google'` in four more places, which is invisible while there is one provider and stops a matched pair connecting the moment there are two. |
-| A2 | ✅ TURN health check (`/api/media/health`, the five-minute cron, `npm run verify:production`) | Asks Cloudflare for credentials with the deployed key, with no page, no session and no second user. A missing or revoked key breaks calls between strict networks invisibly: users behind a strict NAT simply fail to connect, and no browser suite can see it. |
+| A1 | ✅ HeyHubs browser harness (`pnpm run test:integration:do`) | This app's half of the control plane — the interest queue, the room directory, presence stats — had never run in a browser, and Peerly deploys most of it inert. Standing it up found the provider id hardcoded to `'google'` in four more places, which is invisible while there is one provider and stops a matched pair connecting the moment there are two. |
+| A2 | ✅ TURN health check (`/api/media/health`, the five-minute cron, `pnpm run verify:production`) | Asks Cloudflare for credentials with the deployed key, with no page, no session and no second user. A missing or revoked key breaks calls between strict networks invisibly: users behind a strict NAT simply fail to connect, and no browser suite can see it. |
 | A3 | ✅ Pairing, sync and revocation in the harness | Two contexts on one account with different device keys: they pair, exchange grants, sync, and revoke. One assertion per sync rule — a value the other device lacks arrives, a preference it already chose is left alone, and a key no rule names does not travel. That last one is what closing the allow-list was for. |
 
 ### B — production cutover
@@ -270,7 +270,7 @@ was lifted. Forcing the rest together would be an abstraction over nothing.
 
 ### 5d — the browser harness
 
-✅ `npm run test:e2e:do`. The server half (5c) proved authentication and the
+✅ `pnpm run test:e2e:do`. The server half (5c) proved authentication and the
 control plane; this reaches what it could not — `RealtimeClient`, Trystero and
 ICE in a real browser.
 

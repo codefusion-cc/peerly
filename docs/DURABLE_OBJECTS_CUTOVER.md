@@ -15,16 +15,16 @@ The self-hosted relay and TURN server (the VPS) is retired; no build uses it.
 Use one reviewed commit for the browser and Worker. Run:
 
 ```sh
-npm ci --ignore-scripts
-npm run lint
-npm test
-npm run test:workers
-npm run build
-npm run build:preview
-npm run worker:check
-npm run check:csp
-npm run test:e2e
-npm run test:e2e:do
+pnpm install --frozen-lockfile
+pnpm run lint
+pnpm test
+pnpm run test:workers
+pnpm run build
+pnpm run build:preview
+pnpm run worker:check
+pnpm run check:csp
+pnpm run test:e2e
+pnpm run test:e2e:do
 ```
 
 Both browser suites use a real local Worker and SQLite objects with a test
@@ -76,9 +76,9 @@ at build time; setting Worker `vars` cannot update an already-built browser.
 Signaling needs no setting: every build defaults to `durable-objects`.
 
 ```sh
-VITE_CONTENT_BACKEND=durable-objects npm run build
-npm run worker:check
-npm run check:csp
+VITE_CONTENT_BACKEND=durable-objects pnpm run build
+pnpm run worker:check
+pnpm run check:csp
 ```
 
 Production deploys from `main` through CI, which builds `dist/` and deploys it
@@ -91,7 +91,7 @@ Check these before declaring success:
 
 - `/api/network/enroll` and `/api/network/session` succeed for valid devices,
   and the session carries Cloudflare ICE servers.
-- `npm run verify:production` passes (HSTS, TURN health).
+- `pnpm run verify:production` passes (HSTS, TURN health).
 - `/api/realtime/control`, `/api/realtime/lobby/peerly-lobby-v1`, and authorized
   `/api/realtime/content/<route>` upgrades succeed.
 - `/api/rendezvous/presence` issues a token-free certificate;
@@ -117,7 +117,7 @@ tokens, email claims, room secrets, and message contents.
 ## Rollback
 
 Restore the browser and runtime together: `VITE_CONTENT_BACKEND=p2p` (or
-unset) during `npm run build`, and `CONTENT_BACKEND=p2p` in the Worker.
+unset) during `pnpm run build`, and `CONTENT_BACKEND=p2p` in the Worker.
 Signaling stays on Durable Objects.
 
 Deploy that matched artifact/configuration and verify fresh and existing

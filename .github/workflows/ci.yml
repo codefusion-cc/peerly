@@ -22,45 +22,36 @@ jobs:
           node-version: '24'
           package-manager-cache: false
 
-      - name: Verify toolchain majors
-        # npm ci only needs the same MAJORS that wrote the lockfile (node 24 /
-        # npm 11). Byte-exact patch pins here and in .nvmrc are what kept
-        # breaking installs: any registry/mirror gap for that one version fails
-        # the build — Cloudflare's tool installer hit exactly that.
-        run: |
-          node --version | grep -Eq '^v24\.' || (echo "need Node 24.x, got $(node --version)" && exit 1)
-          npm --version | grep -Eq '^11\.' || (echo "need npm 11.x, got $(npm --version)" && exit 1)
+      # pnpm is the version package.json's packageManager names.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - run: pnpm install --frozen-lockfile
 
-      # Dependencies are all prebuilt JS/native packages; suppress lifecycle
-      # scripts to avoid Sharp falling back to an unnecessary source build.
-      - run: npm ci --ignore-scripts
+      - run: pnpm run audit:production
 
-      - run: npm run audit:production
+      - run: pnpm run lint
 
-      - run: npm run lint
+      - run: pnpm test
 
-      - run: npm test
+      - run: pnpm run test:workers
 
-      - run: npm run test:workers
-
-      - run: npm run test:coverage
+      - run: pnpm run test:coverage
 
       - name: Build and prove retired static credentials cannot enter the bundle
-        run: npm run build
+        run: pnpm run build
         env:
           VITE_RELAY_TOKEN: STATIC_RELAY_SECRET_MUST_NOT_SHIP
           VITE_TURN_USERNAME: STATIC_TURN_USER_MUST_NOT_SHIP
           VITE_TURN_CREDENTIAL: STATIC_TURN_SECRET_MUST_NOT_SHIP
 
-      - run: npm run worker:check
+      - run: pnpm run worker:check
 
-      - run: npx playwright install --with-deps chromium
+      - run: pnpm exec playwright install --with-deps chromium
 
-      - run: npm run check:csp
+      - run: pnpm run check:csp
 
-      - run: npm run test:e2e
+      - run: pnpm run test:e2e
 
-      - run: npm run test:e2e:do
+      - run: pnpm run test:e2e:do
 
   # Mutation testing is a gate like `test`: it runs on every pull request, so
   # the automerge workflow merges only when it passes, and the deploy waits for
@@ -77,7 +68,9 @@ jobs:
           node-version: '24'
           package-manager-cache: false
 
-      - run: npm ci --ignore-scripts
+      # pnpm is the version package.json's packageManager names.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - run: pnpm install --frozen-lockfile
 
       # Each run saves its report under a key of its own and restores the newest one.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -86,11 +79,11 @@ jobs:
           key: stryker-incremental-${{ github.run_id }}
           restore-keys: stryker-incremental-
 
-      - run: npm run test:mutation
+      - run: pnpm run test:mutation
 
   # Every push to main that passes `test` and `mutation` goes to production (Worker `peerly`),
   # as Workers Builds did before the repository moved to codefusion-cc: the
-  # same `npm run build` with the same build variables, then `wrangler deploy`
+  # same `pnpm run build` with the same build variables, then `wrangler deploy`
   # (whose `build` block compiles packages/core). Peerly has no D1 database
   # and no version endpoint;
   # the last step waits for the new entry script instead.
@@ -121,13 +114,14 @@ jobs:
           check-latest: true
           package-manager-cache: false
 
-      # As in `test`; without the token, so no dependency ever sees it.
-      - run: npm ci --ignore-scripts
+      # pnpm is the version package.json's packageManager names.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - run: pnpm install --frozen-lockfile
 
       # The one public build value production needs. Signaling and TURN come
       # from the Worker at runtime, so nothing about them is baked in.
       - name: Build
-        run: npm run build
+        run: pnpm run build
         env:
           VITE_GOOGLE_CLIENT_ID: 724645084534-eb9led5upjj8p46dr890tg3a0k3sonsk.apps.googleusercontent.com
 
@@ -139,7 +133,7 @@ jobs:
             echo "::error::The production environment's CLOUDFLARE_API_TOKEN secret is not set; see README.md (Deploy)"
             exit 1
           fi
-          npx wrangler deploy --message "${GITHUB_SHA::7} ${GITHUB_EVENT_NAME} by ${GITHUB_ACTOR}"
+          pnpm exec wrangler deploy --message "${GITHUB_SHA::7} ${GITHUB_EVENT_NAME} by ${GITHUB_ACTOR}"
 
       # No version endpoint: the page's entry script, whose name carries its
       # content hash, says which build peerly.cc serves.
@@ -165,4 +159,4 @@ jobs:
       # the provisioned key. A revoked key fails here and in the five-minute
       # media health cron, not in someone's call.
       - name: peerly.cc gets Cloudflare TURN
-        run: npm run verify:production
+        run: pnpm run verify:production

@@ -51,7 +51,7 @@ export const DEFAULT_NOSTR_RELAYS = [
 // Losing one relay is harmless — peers only need one working relay in common —
 // but a dead entry is pure console noise, so keep this list to relays actually
 // verified against the ephemeral events Trystero signals with. Peerly's
-// `npm run check:relays` re-checks the list; a one-shot probe is not enough
+// `pnpm run check:relays` re-checks the list; a one-shot probe is not enough
 // evidence, since that is exactly how mostr.pub got in here.
 
 /** Nostr relay URLs (wss://…). Override via VITE_NOSTR_RELAYS comma-separated env. */

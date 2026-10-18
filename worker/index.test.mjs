@@ -25,7 +25,7 @@ describe('deployment profiles', () => {
   it('keeps messages and files on the server on preview.peerly.cc only', () => {
     expect(previewConfig.assets.directory).not.toBe(productionConfig.assets.directory)
     expect(previewConfig.assets.directory).toBe('./dist-preview')
-    expect(previewConfig.build.command).toContain('npm run build:preview')
+    expect(previewConfig.build.command).toContain('pnpm run build:preview')
     expect(previewConfig.routes).toContainEqual({ pattern: 'preview.peerly.cc', custom_domain: true })
     expect(resolveContentBackend('durable-objects')).toBe(previewConfig.vars.CONTENT_BACKEND)
     expect(previewConfig.build.command).toContain('VITE_CONTENT_BACKEND=durable-objects')

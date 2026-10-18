@@ -30,22 +30,22 @@ Per-screen behavior is in [views.md](views.md); several tabs of one browser in [
 
 ## Tests and checks
 
-- Typecheck `npm run typecheck`; lint `npm run lint` (oxlint); build `npm run build` (also bundle, size and `guard:preview` guards: link-preview tags, `og-v1.jpg` and `robots.txt` in `dist/`; a new preview image gets a new file name).
-- Unit (jsdom, `src/`, `packages/core/src`, `worker/**/*.test.mjs`): `npm test -- --maxWorkers=2`. Worker (workerd, `*.workers.test.*` in `packages/core/worker/realtime` and `worker/`): `npm run test:workers`; `npm run worker:check` after changing a wrangler config. `worker/realtime/legacySessions.workers.test.mjs` holds capabilities and cookies minted before the control plane moved to the package: if it goes red, a deploy would sign devices out.
-- E2E (Playwright): `npm run test:e2e` and `npm run test:e2e:do` (built app behind the real Worker and DOs, p2p and DO content), `npm run test:a11y`. `test:mutation` (incremental) is a CI gate the deploy waits for; the weekly full re-test is in `security.yml`.
+- Typecheck `pnpm run typecheck`; lint `pnpm run lint` (oxlint); build `pnpm run build` (also bundle, size and `guard:preview` guards: link-preview tags, `og-v1.jpg` and `robots.txt` in `dist/`; a new preview image gets a new file name).
+- Unit (jsdom, `src/`, `packages/core/src`, `worker/**/*.test.mjs`): `pnpm test -- --maxWorkers=2`. Worker (workerd, `*.workers.test.*` in `packages/core/worker/realtime` and `worker/`): `pnpm run test:workers`; `pnpm run worker:check` after changing a wrangler config. `worker/realtime/legacySessions.workers.test.mjs` holds capabilities and cookies minted before the control plane moved to the package: if it goes red, a deploy would sign devices out.
+- E2E (Playwright): `pnpm run test:e2e` and `pnpm run test:e2e:do` (built app behind the real Worker and DOs, p2p and DO content), `pnpm run test:a11y`. `test:mutation` (incremental) is a CI gate the deploy waits for; the weekly full re-test is in `security.yml`.
 - CI (`.github/workflows/ci.yml`) also runs audit, coverage, `check:csp` and mutation testing (the deploy needs it).
 
 ## Deploy and migrations
 
-- Merge to `main`: the `deploy production` job in `ci.yml` builds, runs `wrangler deploy` to https://peerly.cc, checks the served entry script and runs `npm run verify:production` (HSTS, TURN health).
-- Staging `preview.peerly.cc` is manual: `codefusion-console cloudflare workers:edit,domains:edit -- npm run deploy:preview` (README "Durable Objects control plane"). Output goes to `dist-preview/`.
+- Merge to `main`: the `deploy production` job in `ci.yml` builds, runs `wrangler deploy` to https://peerly.cc, checks the served entry script and runs `pnpm run verify:production` (HSTS, TURN health).
+- Staging `preview.peerly.cc` is manual: `codefusion-console cloudflare workers:edit,domains:edit -- pnpm run deploy:preview` (README "Durable Objects control plane"). Output goes to `dist-preview/`.
 - DO migrations live in each wrangler config with its own history; there is no SQL database.
 
 ## Gotchas
 
-- `VITE_APP_ID=peerly` is needed for vite, tsc and tests; use the npm scripts, not bare `npx`.
-- `npm run dev` signals through public Nostr: the Vite dev server has no Worker. Use the E2E servers to exercise the Durable Objects path.
+- `VITE_APP_ID=peerly` is needed for vite, tsc and tests; use the package scripts (`pnpm run`), not bare `pnpm exec`.
+- `pnpm run dev` signals through public Nostr: the Vite dev server has no Worker. Use the E2E servers to exercise the Durable Objects path.
 - TURN secrets (`TURN_KEY_ID`, `TURN_KEY_API_TOKEN`) are provisioned through CodeFusion Console, never set by hand.
 - Workspace semantics (allow-lists, handshakes, history sanitization) stay in `src/collab`, not in `packages/core`. Generic code goes to the package.
-- Node 24.18.0 / npm 11.16.0 are enforced (`.nvmrc`, `.npmrc`, CI); a mismatch exits early.
+- Node 24 and pnpm 12.14.0 (`packageManager`) are enforced (`devEngines`, `engineStrict` in `pnpm-workspace.yaml`, CI); a mismatch exits early.
 - Google sign-in on branch previews needs `VITE_GOOGLE_CALLBACK_ORIGIN` (README "Testing branches with Google sign-in"), and every origin's `/api/auth/google/callback` registered with the Google client.

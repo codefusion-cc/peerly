@@ -62,7 +62,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "npm run build"
+    "prepack": "pnpm run build"
   },
   "dependencies": {
     "@codefusion-cc/realtime-media": "^0.1.5",

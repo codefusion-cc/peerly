@@ -4,8 +4,8 @@
   // server/test-server.mjs, which sets the content backend, the assets
   // directory and the harness's own origin per suite:
   //
-  //   npm run test:e2e      production's shape (content peer to peer)
-  //   npm run test:e2e:do   preview's shape (content in the Durable Objects)
+  //   pnpm run test:e2e      production's shape (content peer to peer)
+  //   pnpm run test:e2e:do   preview's shape (content in the Durable Objects)
   //
   // Never deployed. It has no routes, and it configures a test identity
   // provider whose JWKS is served from its own origin — which is safe only

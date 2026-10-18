@@ -616,7 +616,7 @@ Reliability mechanisms:
   browser/Worker configuration change.
 - A cron every five minutes (`MEDIA_HEALTH_CRON`) and the public, rate-limited
   `GET /api/media/health` (`MEDIA_RATE_LIMITER`) check that the TURN key still
-  mints credentials; `npm run verify:production` calls the endpoint after
+  mints credentials; `pnpm run verify:production` calls the endpoint after
   every production deploy.
 
 ## Observability and quota controls

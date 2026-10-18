@@ -76,7 +76,7 @@ import type { SignalingStrategy } from './collab/signaling'
 
 // The Nostr and Supabase dev signaling config lives in @peerly/core
 // (packages/core/src/relays.ts); these wrappers bind it to this app's
-// build-time env. `npm run check:relays` reads the list out of the package
+// build-time env. `pnpm run check:relays` reads the list out of the package
 // source.
 export { DEFAULT_NOSTR_RELAYS } from '@peerly/core'
 
