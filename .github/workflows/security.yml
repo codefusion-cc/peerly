@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   codeql:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LIGHT || vars.CI_RUNNER_SMALL || 'cf-2g' }}
     permissions:
       contents: read
       security-events: write
@@ -26,7 +26,7 @@ jobs:
 
   dependency-review:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LIGHT || vars.CI_RUNNER_SMALL || 'cf-2g' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -44,7 +44,7 @@ jobs:
           fail-on-severity: high
 
   secret-scan:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LIGHT || vars.CI_RUNNER_SMALL || 'cf-2g' }}
     permissions:
       contents: read
     steps:
@@ -56,11 +56,17 @@ jobs:
       - name: Install gitleaks
         env:
           VERSION: 8.30.1
-          SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
         run: |
+          case "$RUNNER_OS-$RUNNER_ARCH" in
+            Linux-X64) platform=linux_x64 sha=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb ;;
+            Linux-ARM64) platform=linux_arm64 sha=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080 ;;
+            macOS-X64) platform=darwin_x64 sha=dfe101a4db2255fc85120ac7f3d25e4342c3c20cf749f2c20a18081af1952709 ;;
+            macOS-ARM64) platform=darwin_arm64 sha=b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5 ;;
+            *) echo "::error::no gitleaks build for $RUNNER_OS $RUNNER_ARCH"; exit 1 ;;
+          esac
           curl -fsSLo "$RUNNER_TEMP/gitleaks.tar.gz" \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
-          echo "$SHA256  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_${platform}.tar.gz"
+          echo "$sha  $RUNNER_TEMP/gitleaks.tar.gz" | shasum -a 256 -c -
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
       # Like the action: a pull request or a push scans its own commits, the
       # weekly run every ref's history. .gitleaks.toml applies.
@@ -84,7 +90,7 @@ jobs:
   # a deploy never waits for it. --force ignores the incremental report.
   mutation-full:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_HEAVY || vars.CI_RUNNER || 'self-hosted' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6

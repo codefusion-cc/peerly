@@ -50,7 +50,6 @@
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "verify:production": "node scripts/verify-production.mjs",
     "worker:check": "wrangler types --check && wrangler types worker-configuration.preview.d.ts -c wrangler.preview.jsonc --env-interface PreviewEnv --check && wrangler deploy --dry-run --env='' && wrangler deploy --dry-run -c wrangler.preview.jsonc",
-    "test:bump": "node --test scripts/bump-version.test.mjs",
     "test:e2e:do": "VITE_APP_ID=peerly playwright test -c playwright.do.config.ts",
     "typecheck": "VITE_APP_ID=peerly tsc -b",
     "build:e2e": "VITE_APP_ID=peerly tsc -b && VITE_APP_ID=peerly vite build --outDir ${E2E_DIST:-dist-e2e} && node scripts/check-e2e-fixtures.mjs ${E2E_DIST:-dist-e2e}",

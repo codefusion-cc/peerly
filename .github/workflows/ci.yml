@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_HEAVY || vars.CI_RUNNER || 'self-hosted' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
@@ -68,7 +68,7 @@ jobs:
   # re-tests only the mutants in code or tests changed since the last one; the
   # full weekly run is in security.yml and blocks nothing.
   mutation:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_HEAVY || vars.CI_RUNNER || 'self-hosted' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
@@ -98,7 +98,7 @@ jobs:
     name: deploy production
     needs: [test, mutation]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.CI_RUNNER_HEAVY || vars.CI_RUNNER || 'self-hosted' }}
     environment:
       name: production
       url: https://peerly.cc
