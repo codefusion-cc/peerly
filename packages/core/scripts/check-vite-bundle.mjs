@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { readdirSync, statSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 

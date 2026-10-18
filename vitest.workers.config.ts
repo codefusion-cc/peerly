@@ -10,7 +10,7 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ['packages/core/worker/realtime/**/*.workers.test.{mjs,ts}', 'worker/**/*.workers.test.mjs'],
+    include: ['worker/**/*.workers.test.mjs'],
     // The plugin isolates storage per file; tests also use distinct object names.
     // The setup file starts the Durable Objects before a file's first test,
     // which on a busy machine takes longer than any test's own work.

@@ -15,12 +15,11 @@ import { readWranglerConfig } from '../testing/wranglerConfig.mjs'
 
 // Every `env.NAME` the Worker's own code reads (tests aside), so a declared
 // name with a typo shows up here.
-const workerSources = ['../', '../../packages/core/worker/'].flatMap(dir => {
-  const root = new URL(dir, import.meta.url)
-  return readdirSync(root, { recursive: true })
+const workerSources = [new URL('../', import.meta.url), new URL('worker/', import.meta.resolve('@peerly/core/package.json'))].flatMap(root =>
+  readdirSync(root, { recursive: true })
     .filter(file => file.endsWith('.mjs') && !file.includes('.test.'))
-    .map(file => readFileSync(new URL(file, root), 'utf8'))
-})
+    .map(file => readFileSync(new URL(file, root), 'utf8')),
+)
 const workerReads = new Set(workerSources.flatMap(source => [...source.matchAll(/env\??\.([A-Z][A-Z0-9_]*)/g)].map(m => m[1])))
 
 // What the relay and coturn need; the Worker stops reading them once

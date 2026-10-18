@@ -11,14 +11,14 @@
   },
   "type": "module",
   "sideEffects": false,
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "@peerly/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
     "./react": {
+      "@peerly/source": "./src/react.ts",
       "types": "./dist/react.d.ts",
       "default": "./dist/react.js"
     },
@@ -32,14 +32,17 @@
       "default": "./worker/lobbyIdentity.mjs"
     },
     "./realtime/protocol": {
+      "@peerly/source": "./src/protocol/index.ts",
       "types": "./dist/protocol/index.d.ts",
       "default": "./dist/protocol/index.js"
     },
     "./realtime/domain": {
+      "@peerly/source": "./src/domain/index.ts",
       "types": "./dist/domain/index.d.ts",
       "default": "./dist/domain/index.js"
     },
     "./realtime/ports": {
+      "@peerly/source": "./src/ports/index.ts",
       "types": "./dist/ports/index.d.ts",
       "default": "./dist/ports/index.js"
     },
@@ -49,22 +52,45 @@
     "./worker/realtime/ephemeral-channel": {
       "default": "./worker/realtime/gateway/ephemeralChannel.mjs"
     },
+    "./worker/realtime/signal-scope": {
+      "default": "./worker/realtime/gateway/signalScope.mjs"
+    },
     "./worker/identity": {
       "default": "./worker/identity.mjs"
-    }
+    },
+    "./device-token": {
+      "@peerly/source": "./src/auth/deviceToken.ts",
+      "types": "./dist/auth/deviceToken.d.ts",
+      "default": "./dist/auth/deviceToken.js"
+    },
+    "./user-id": {
+      "@peerly/source": "./src/userId.ts",
+      "types": "./dist/userId.d.ts",
+      "default": "./dist/userId.js"
+    },
+    "./usage-budget": {
+      "@peerly/source": "./src/usageBudget.ts",
+      "types": "./dist/usageBudget.d.ts",
+      "default": "./dist/usageBudget.js"
+    },
+    "./channel-capability": {
+      "@peerly/source": "./src/channelCapability.ts",
+      "types": "./dist/channelCapability.d.ts",
+      "default": "./dist/channelCapability.js"
+    },
+    "./package.json": "./package.json"
   },
-  "files": [
-    "dist",
-    "worker",
-    "scripts/check-vite-bundle.mjs",
-    "README.md",
-    "LICENSE"
-  ],
+  "bin": {
+    "peerly-check-vite-bundle": "./scripts/check-vite-bundle.mjs"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "pnpm run build"
+    "test": "vitest run --maxWorkers=4 && node scripts/check-self-contained.mjs",
+    "test:coverage": "vitest run --coverage --maxWorkers=4"
   },
   "dependencies": {
+    "@codefusion-cc/google-sign-in": "^0.1.2",
+    "@codefusion-cc/realtime": "^0.1.6",
     "@codefusion-cc/realtime-media": "^0.1.5",
     "@trystero-p2p/core": "^0.25.3",
     "@trystero-p2p/nostr": "^0.25.3"
@@ -81,16 +107,16 @@
       "optional": true
     }
   },
-  "engines": {
-    "node": ">=20"
-  },
-  "keywords": [
-    "webrtc",
-    "p2p",
-    "trystero",
-    "durable-objects",
-    "peerly",
-    "room",
-    "nostr"
-  ]
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@trystero-p2p/supabase": "^0.25.3",
+    "@types/node": "^24.13.2",
+    "@vitest/coverage-v8": "^4.1.11",
+    "fast-check": "^4.10.2",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.11"
+  }
 }

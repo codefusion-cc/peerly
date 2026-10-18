@@ -1,6 +1,6 @@
 import { GOOGLE_ISSUERS, GOOGLE_JWKS_URL, remoteKeys, type KeySet } from '@codefusion-cc/google-sign-in'
 import { GOOGLE_KEYS_PATH, pageGoogleKeys } from '@codefusion-cc/google-sign-in/browser'
-import { verifyDeviceIdToken, type DeviceTokenCheck } from '../auth/deviceToken'
+import { verifyDeviceIdToken, type DeviceTokenCheck } from '@peerly/core/device-token'
 import { E2E_GOOGLE_CLIENT_ID, getE2eJwksFetcher, isE2eAuthBypass } from './e2eAuth'
 
 /** A key set as a test or test mode hands it over: the JWKS document itself. */
@@ -221,7 +221,7 @@ export function providerKeys(provider: Pick<IdentityProvider, 'id' | 'jwksUrl' |
   return remoteKeys(provider.jwksUrl)
 }
 
-/** Verifies a token `provider` issued, bound to `deviceKeyId` (see auth/deviceToken). */
+/** Verifies a token `provider` issued, bound to `deviceKeyId` (see @peerly/core/device-token). */
 export function verifyProviderToken(
   token: string,
   provider: IdentityProvider,

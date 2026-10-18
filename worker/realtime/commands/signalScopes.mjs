@@ -1,6 +1,6 @@
 import { deriveScopeRouteId } from '@codefusion-cc/realtime'
 import { boundedString, defineCommand, FrameError, isPlainObject } from '@codefusion-cc/realtime/protocol'
-import { SCOPE_KINDS } from '../../../packages/core/dist/protocol/index.js'
+import { SCOPE_KINDS } from '@peerly/core/realtime/protocol'
 
 /**
  * `scope.request`: a lease on one `SignalScopeDO`, through which Trystero

@@ -1,7 +1,7 @@
 /**
  * Phase logic for the ID-token lifetime.
  *
- * A device-bound token is accepted for 30 days (auth/deviceToken). The reload
+ * A device-bound token is accepted for 30 days (@peerly/core/device-token). The reload
  * path already handles "expired before open" (session.loadIdToken), but a
  * workspace kept open past that silently
  * loses the ability to admit anyone new — every fresh handshake presents a

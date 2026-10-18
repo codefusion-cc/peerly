@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { DEVICE_TOKEN_MAX_AGE_MS } from '../auth/deviceToken'
+import { DEVICE_TOKEN_MAX_AGE_MS } from '@peerly/core/device-token'
 import { saveIdCredentials } from '../session'
 import { utf8ToBase64Url } from '../utils/base64url'
 import { useIdentityExpiry } from './useIdentityExpiry'

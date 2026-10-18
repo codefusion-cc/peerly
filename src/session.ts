@@ -1,6 +1,6 @@
 import { DEFAULT_USER_COLOR } from './config'
 import { readIdTokenClaims } from '@codefusion-cc/google-sign-in'
-import { deviceTokenAcceptedUntil } from './auth/deviceToken'
+import { deviceTokenAcceptedUntil } from '@peerly/core/device-token'
 import { loadStoredProfile } from './collab/profileStore'
 import { migrateLegacyAvatarDataUrl, resolveAvatarPreview } from './collab/avatarService'
 import type { SignedAllowList } from './collab/allowList'
@@ -50,7 +50,7 @@ const PERSIST_KEY = 'peerly-session'
  *   force a fresh sign-in. It was session-scoped on the reasoning that a
  *   bearer credential should not survive a restart; that traded a real,
  *   constant cost — signing in again every single time — against a narrow
- *   benefit: the token is bound to this device's key (auth/deviceToken), so a
+ *   benefit: the token is bound to this device's key (@peerly/core/device-token), so a
  *   copy is useless without it, and every peer re-verifies it rather than
  *   trusting ours. Changed deliberately, 2026-07-28.
  * - The identity METADATA (email, provider, durable userId) is not a
@@ -58,7 +58,7 @@ const PERSIST_KEY = 'peerly-session'
  *   name, which provider to re-auth with). Peers never trust it; they verify
  *   the token itself in the handshake.
  *
- * A token is accepted for 30 days after it was issued (auth/deviceToken), and
+ * A token is accepted for 30 days after it was issued (@peerly/core/device-token), and
  * a page load quietly refreshes an aging Google one (auth/googleRedirect).
  */
 const ID_TOKEN_KEY = 'peerly-id-token'
@@ -123,7 +123,7 @@ export function loadPersistedSession(): PersistedSession | null {
 }
 
 /**
- * Until when our own stored token is worth presenting: 30 days after the provider issued it (auth/deviceToken),
+ * Until when our own stored token is worth presenting: 30 days after the provider issued it (@peerly/core/device-token),
  * read without verifying the signature. That is safe *for this purpose only*: every peer and the Worker re-verify
  * the token before admitting anyone, so a tampered `iat` buys nothing; we would just be refused. Null when the token
  * does not say when it was issued. Never use this to make an authorization decision.

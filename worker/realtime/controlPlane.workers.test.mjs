@@ -1,11 +1,11 @@
 import { env } from 'cloudflare:workers'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { deriveScopeRouteId, identityIssueProof } from '@codefusion-cc/realtime'
-import { deriveUserId } from '../../packages/core/dist/userId.js'
-import { clearOidcJwksCache } from '../../packages/core/worker/oidc.mjs'
+import { deriveUserId } from '@peerly/core/user-id'
+import { clearOidcJwksCache } from '@peerly/core/worker/oidc'
 import { workspacePolicy } from './commands/content.test-fixtures.mjs'
 import { createTestAccounts, openPageControlSocket } from '../testing/testAccounts.mjs'
-import { deviceSignInNonce } from '../../src/auth/deviceToken.ts'
+import { deviceSignInNonce } from '@peerly/core/device-token'
 import worker from '../index.mjs'
 
 /**
