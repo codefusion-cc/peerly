@@ -26,7 +26,7 @@
     "stop": "lsof -ti :5173 -ti :5174 -ti :17273 2>/dev/null | xargs kill -9 2>/dev/null || true",
     "build": "pnpm run build:core && VITE_APP_ID=peerly tsc -b && VITE_APP_ID=peerly vite build && pnpm run guard:bundle && pnpm run guard:size && pnpm run guard:preview",
     "test": "pnpm run build:core && pnpm --filter @peerly/core test && VITE_APP_ID=peerly vitest run --maxWorkers=4 && pnpm run test:preview",
-    "test:preview": "node --test scripts/guard-preview.test.mjs",
+    "test:preview": "node --test 'scripts/*.test.mjs'",
     "test:watch": "VITE_APP_ID=peerly vitest",
     "test:workers": "pnpm run build:core && mkdir -p dist && vitest run -c vitest.workers.config.ts",
     "test:e2e": "pnpm run build:core && VITE_APP_ID=peerly playwright test",
