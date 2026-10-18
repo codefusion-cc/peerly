@@ -8,20 +8,14 @@
     "type": "git",
     "url": "https://github.com/codefusion-cc/peerly.git"
   },
-  "packageManager": "npm@11.16.0",
+  "packageManager": "pnpm@12.14.0",
   "engines": {
-    "node": ">=24 <25",
-    "npm": ">=11"
+    "node": ">=24 <25"
   },
   "devEngines": {
     "runtime": {
       "name": "node",
       "version": "^24.0.0",
-      "onFail": "error"
-    },
-    "packageManager": {
-      "name": "npm",
-      "version": "^11.0.0",
       "onFail": "error"
     }
   },
@@ -30,14 +24,14 @@
     "dev": "node server/dev.mjs",
     "dev:app": "VITE_APP_ID=peerly VITE_CONTENT_BACKEND=p2p vite --host",
     "stop": "lsof -ti :5173 -ti :5174 -ti :17273 2>/dev/null | xargs kill -9 2>/dev/null || true",
-    "build": "VITE_APP_ID=peerly tsc -b && VITE_APP_ID=peerly vite build && npm run guard:bundle && npm run guard:size && npm run guard:preview",
-    "test": "VITE_APP_ID=peerly vitest run --maxWorkers=4 && npm run test:preview",
+    "build": "pnpm run build:core && VITE_APP_ID=peerly tsc -b && VITE_APP_ID=peerly vite build && pnpm run guard:bundle && pnpm run guard:size && pnpm run guard:preview",
+    "test": "pnpm run build:core && VITE_APP_ID=peerly vitest run --maxWorkers=4 && pnpm run test:preview",
     "test:preview": "node --test scripts/guard-preview.test.mjs",
     "test:watch": "VITE_APP_ID=peerly vitest",
-    "test:workers": "mkdir -p dist && vitest run -c vitest.workers.config.ts",
+    "test:workers": "pnpm run build:core && mkdir -p dist && vitest run -c vitest.workers.config.ts",
     "test:e2e": "VITE_APP_ID=peerly playwright test",
     "test:a11y": "VITE_APP_ID=peerly playwright test e2e/accessibility.spec.ts",
-    "test:coverage": "VITE_APP_ID=peerly vitest run --coverage --maxWorkers=4",
+    "test:coverage": "pnpm run build:core && VITE_APP_ID=peerly vitest run --coverage --maxWorkers=4",
     "test:mutation": "VITE_APP_ID=peerly stryker run",
     "test:e2e:ui": "VITE_APP_ID=peerly playwright test --ui",
     "lint": "oxlint",
@@ -47,21 +41,15 @@
     "guard:size": "node packages/core/scripts/check-vite-bundle.mjs dist/assets 700000",
     "check:csp": "node scripts/check-csp.mjs",
     "check:relays": "node scripts/check-relays.mjs",
-    "audit:production": "npm audit --omit=dev --audit-level=high",
+    "audit:production": "pnpm audit --prod --audit-level high",
     "verify:production": "node scripts/verify-production.mjs",
     "worker:check": "wrangler types --check && wrangler types worker-configuration.preview.d.ts -c wrangler.preview.jsonc --env-interface PreviewEnv --check && wrangler deploy --dry-run --env='' && wrangler deploy --dry-run -c wrangler.preview.jsonc",
     "test:e2e:do": "VITE_APP_ID=peerly playwright test -c playwright.do.config.ts",
     "typecheck": "VITE_APP_ID=peerly tsc -b",
-    "build:e2e": "VITE_APP_ID=peerly tsc -b && VITE_APP_ID=peerly vite build --outDir ${E2E_DIST:-dist-e2e} && node scripts/check-e2e-fixtures.mjs ${E2E_DIST:-dist-e2e}",
-    "build:core": "npm --prefix packages/core run build",
-    "pretest": "npm run build:core",
-    "pretest:workers": "npm run build:core",
-    "pretest:coverage": "npm run build:core",
-    "prebuild": "npm run build:core",
-    "prebuild:e2e": "npm run build:core",
+    "build:e2e": "pnpm run build:core && VITE_APP_ID=peerly tsc -b && VITE_APP_ID=peerly vite build --outDir ${E2E_DIST:-dist-e2e} && node scripts/check-e2e-fixtures.mjs ${E2E_DIST:-dist-e2e}",
+    "build:core": "tsc -p packages/core/tsconfig.build.json",
     "deploy:preview": "wrangler deploy -c wrangler.preview.jsonc",
-    "build:preview": "VITE_APP_ID=peerly tsc -b && VITE_APP_ID=peerly VITE_CONTENT_BACKEND=durable-objects vite build --outDir dist-preview && node scripts/guard-bundle.mjs dist-preview && node packages/core/scripts/check-vite-bundle.mjs dist-preview/assets 700000",
-    "prebuild:preview": "npm run build:core"
+    "build:preview": "pnpm run build:core && VITE_APP_ID=peerly tsc -b && VITE_APP_ID=peerly VITE_CONTENT_BACKEND=durable-objects vite build --outDir dist-preview && node scripts/guard-bundle.mjs dist-preview && node packages/core/scripts/check-vite-bundle.mjs dist-preview/assets 700000"
   },
   "dependencies": {
     "@codefusion-cc/app-update": "^0.1.2",
@@ -101,9 +89,5 @@
     "vite": "^8.1.1",
     "vitest": "^4.1.11",
     "wrangler": "^4.145.0"
-  },
-  "overrides": {
-    "sharp": "^0.35.4",
-    "qs": "^6.15.3"
   }
 }

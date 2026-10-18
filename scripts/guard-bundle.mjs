@@ -44,7 +44,7 @@ let files
 try {
   files = walk(DIST)
 } catch {
-  console.error(`guard:bundle — no ${DIST}/ directory. Run "npm run build" first.`)
+  console.error(`guard:bundle — no ${DIST}/ directory. Run "pnpm run build" first.`)
   process.exit(1)
 }
 

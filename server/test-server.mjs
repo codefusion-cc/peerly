@@ -47,7 +47,7 @@ function runToCompletion(command, args, env) {
 // stay an unconditional "this artefact may not ship" check rather than one an
 // environment variable can talk out of. The E2E path asserts the opposite —
 // that the fixtures *are* present — in check-e2e-fixtures.mjs.
-runToCompletion('npm', ['run', 'build:e2e'], {
+runToCompletion('pnpm', ['run', 'build:e2e'], {
   E2E_DIST: DIST,
   VITE_APP_ID: 'peerly',
   VITE_CONTENT_BACKEND: CONTENT,
@@ -68,8 +68,8 @@ const persistenceDirectory = mkdtempSync(join(tmpdir(), 'peerly-e2e-'))
 process.on('exit', () => {
   rmSync(persistenceDirectory, { recursive: true, force: true })
 })
-run('wrangler', 'npx', [
-  'wrangler', 'dev',
+run('wrangler', 'pnpm', [
+  'exec', 'wrangler', 'dev',
   '-c', 'wrangler.e2e.jsonc',
   '--assets', DIST,
   '--port', String(PORT),

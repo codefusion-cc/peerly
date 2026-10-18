@@ -10,7 +10,7 @@ import { createEvent } from '@trystero-p2p/nostr'
  * subscribe, publish, and require the event to come back — and captures the
  * relay's own rejection reason when it doesn't.
  *
- * Same protocol as Peerly's `npm run check:relays`, usable in the browser.
+ * Same protocol as Peerly's `pnpm run check:relays`, usable in the browser.
  * Each probe opens two short-lived sockets per relay; call it on demand
  * (a diagnostics panel, a re-check button), not on a tight interval —
  * public relays throttle exactly that.

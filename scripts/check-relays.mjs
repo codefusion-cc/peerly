@@ -8,11 +8,11 @@
  * come back.
  *
  * Run it before trusting DEFAULT_NOSTR_RELAYS after any edit:
- *   npm run check:relays
- *   npm run check:relays -- wss://candidate.example
+ *   pnpm run check:relays
+ *   pnpm run check:relays -- wss://candidate.example
  *
  * Public relays come and go. This is a diagnostic, not a test — it is not part
- * of `npm test`, because a third party going down should not fail your build.
+ * of `pnpm test`, because a third party going down should not fail your build.
  */
 import { readFileSync } from 'fs'
 import { createEvent } from '@trystero-p2p/nostr'

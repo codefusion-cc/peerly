@@ -1,0 +1,8 @@
+# Install scripts run only for these; any other dependency with one fails the install until it is named here.
+allowBuilds:
+  esbuild: true
+  workerd: true
+  # core-js (through @tensorflow/tfjs) only prints a notice.
+  core-js: false
+
+engineStrict: true

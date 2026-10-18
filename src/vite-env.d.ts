@@ -7,7 +7,7 @@ declare const __APP_COMMIT__: string
 
 interface ImportMetaEnv {
   readonly VITE_NOSTR_RELAYS: string
-  /** Unset in every deployment: Durable Objects. `nostr` and `supabase` are for `npm run dev`. */
+  /** Unset in every deployment: Durable Objects. `nostr` and `supabase` are for `pnpm run dev`. */
   readonly VITE_SIGNALING?: 'nostr' | 'supabase'
   readonly VITE_SUPABASE_URL: string
   readonly VITE_SUPABASE_ANON_KEY: string

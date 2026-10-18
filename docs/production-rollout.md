@@ -15,12 +15,12 @@ history.
 
 ## Checks after a deploy
 
-CI runs `npm run verify:production` after every production deploy: the site
+CI runs `pnpm run verify:production` after every production deploy: the site
 must send HSTS, and `GET /api/media/health` must report that the Worker still
 gets TURN credentials from Cloudflare. The same check runs from the Worker's
 cron every five minutes and logs an error when it fails twice, three seconds
 apart; the console turns that line into a failure. Run it against preview with
-`PRODUCTION_SITE_URL=https://preview.peerly.cc npm run verify:production`.
+`PRODUCTION_SITE_URL=https://preview.peerly.cc pnpm run verify:production`.
 
 ## Independent review
 

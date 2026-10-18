@@ -11,7 +11,7 @@ export default defineConfig({
       // worker/index.test.mjs runs in plain Node, not the Workers runtime, so
       // the Durable Object classes it reaches get `DurableObject` from the
       // console package's stand-in. Real behavior is covered by
-      // npm run test:workers.
+      // pnpm run test:workers.
       { find: 'cloudflare:workers', replacement: fileURLToPath(import.meta.resolve('@codefusion-cc/console/testing/cloudflare-workers')) },
     ],
   },
@@ -22,7 +22,7 @@ export default defineConfig({
     // (worker/console/consoleAdmin.mjs).
     server: { deps: { inline: ['@codefusion-cc/realtime-media', '@codefusion-cc/realtime', '@codefusion-cc/console'] } },
     include: ['src/**/*.test.{ts,tsx}', 'packages/core/src/**/*.test.ts', 'worker/**/*.test.mjs'],
-    // npm run test:workers runs these in workerd.
+    // pnpm run test:workers runs these in workerd.
     exclude: [...configDefaults.exclude, '**/*.workers.test.*'],
     coverage: {
       provider: 'v8',

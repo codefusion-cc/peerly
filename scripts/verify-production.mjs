@@ -1,8 +1,8 @@
 // Checks a deployment from outside: the site answers with HSTS, and its
 // Worker can get Cloudflare TURN credentials (the public media health check,
 // which never hands any out).
-//   npm run verify:production                       # https://peerly.cc
-//   PRODUCTION_SITE_URL=https://preview.peerly.cc npm run verify:production
+//   pnpm run verify:production                       # https://peerly.cc
+//   PRODUCTION_SITE_URL=https://preview.peerly.cc pnpm run verify:production
 
 const site = process.env.PRODUCTION_SITE_URL || 'https://peerly.cc'
 const failures = []

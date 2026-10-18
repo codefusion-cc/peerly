@@ -28,7 +28,7 @@ import {
  *
  * What this cannot prove: two Chromium contexts on one host connect over host
  * candidates and never touch TURN. Cloudflare TURN is checked from outside
- * instead, by `npm run verify:production` and the media health cron.
+ * instead, by `pnpm run verify:production` and the media health cron.
  */
 
 const WORKSPACE = 'do-e2e'

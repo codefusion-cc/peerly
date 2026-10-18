@@ -42,7 +42,7 @@ describe('default Nostr relays', () => {
 
   it('keeps enough redundancy that one dead relay is survivable', () => {
     // Peers only need one relay in common, but public relays disappear without
-    // notice (relay.mostr.pub did, mid-deployment). `npm run check:relays`
+    // notice (relay.mostr.pub did, mid-deployment). `pnpm run check:relays`
     // verifies they actually relay ephemeral events; this only guards the floor.
     expect(DEFAULT_NOSTR_RELAYS.length).toBeGreaterThanOrEqual(3)
   })
