@@ -31,7 +31,7 @@ jobs:
         && github.event.workflow_run.event == 'pull_request'
         && github.event.workflow_run.conclusion == 'success'
         && github.event.workflow_run.head_repository.full_name == github.repository)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LIGHT || vars.CI_RUNNER_SMALL || 'cf-2g' }}
     timeout-minutes: 5
     # One run per pull request (its branch) at a time; a newer event waits and replaces any older one waiting.
     concurrency:

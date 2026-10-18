@@ -231,9 +231,12 @@ preview.peerly.cc (below). The build shows `GITHUB_SHA` in the UI as
 
 The deploy needs a `CLOUDFLARE_API_TOKEN` secret in the GitHub environment
 `production` (Settings → Environments) with Workers Scripts Edit on the account
-that holds the `peerly` Worker. Cloudflare Workers Builds, still configured on
-the Worker, lost its GitHub connection when the repository moved to
-codefusion-cc and deploys nothing.
+that holds the `peerly` Worker. Workers Builds must have no triggers on `peerly`:
+only this workflow deploys it.
+
+Every job runs on the runner the repository variables `CI_RUNNER_HEAVY` (tests,
+builds, deploy) and `CI_RUNNER_LIGHT` (short checks) name, which CodeFusion
+Console sets. Unset, they fall back to CodeFusion's own machines.
 
 Register the production origin (`https://peerly.cc`) in each OAuth provider's allowed JavaScript origins / redirect URIs.
 
